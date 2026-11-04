@@ -1,0 +1,72 @@
+from pathlib import Path
+
+import pytest
+
+from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
+from fhir_prototype.bundle_loader import load_bundle
+
+BASE = "https://fhir.example.org"
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def make_bundle(*resources):
+    """Wrap resources into a collection bundle, fullUrl = BASE/Type/id."""
+    bundle = {"resourceType": "Bundle", "type": "collection", "entry": []}
+    for resource in resources:
+        bundle["entry"].append({
+            "fullUrl": f"{BASE}/{resource['resourceType']}/{resource['id']}",
+            "resource": resource,
+        })
+    return bundle
+
+
+def test_of_type_returns_only_resources_of_that_type():
+    patient = {"resourceType": "Patient", "id": "p1"}
+    obs1 = {"resourceType": "Observation", "id": "o1"}
+    obs2 = {"resourceType": "Observation", "id": "o2"}
+    index = BundleIndex(make_bundle(patient, obs1, obs2))
+
+    result = index.of_type("Observation")
+
+    assert result == [obs1, obs2]
+
+
+def test_of_type_returns_empty_list_for_missing_type():
+    patient = {"resourceType": "Patient", "id": "p1"}
+    index = BundleIndex(make_bundle(patient))
+
+    result = index.of_type("Encounter")
+
+    assert result == []
+
+
+def test_resolve_returns_referenced_resource():
+    patient = {"resourceType": "Patient", "id": "p1"}
+    obs = {
+        "resourceType": "Observation",
+        "id": "o1",
+        "subject": {"reference": f"{BASE}/Patient/p1"},
+    }
+    index = BundleIndex(make_bundle(patient, obs))
+
+    result = index.resolve(obs["subject"]["reference"])
+
+    assert result is patient
+
+
+def test_resolve_raises_for_unknown_reference():
+    index = BundleIndex(make_bundle({"resourceType": "Patient", "id": "p1"}))
+    missing = f"{BASE}/Patient/does-not-exist"
+
+    with pytest.raises(UnresolvedReferenceError, match=missing):
+        index.resolve(missing)
+
+
+def test_all_observation_references_resolve_in_max_bundle():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_1.json"))
+
+    for obs in index.of_type("Observation"):
+        assert index.resolve(obs["subject"]["reference"])["resourceType"] == "Patient"
+        assert index.resolve(obs["encounter"]["reference"])["resourceType"] == "Encounter"
+        if "device" in obs:
+            assert index.resolve(obs["device"]["reference"])["resourceType"] == "DeviceMetric"
