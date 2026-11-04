@@ -4,20 +4,10 @@ import pytest
 
 from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
 from fhir_prototype.bundle_loader import load_bundle
+from helpers import make_bundle
 
-BASE = "https://fhir.example.org"
 FIXTURES = Path(__file__).parent / "fixtures"
-
-
-def make_bundle(*resources):
-    """Wrap resources into a collection bundle, fullUrl = BASE/Type/id."""
-    bundle = {"resourceType": "Bundle", "type": "collection", "entry": []}
-    for resource in resources:
-        bundle["entry"].append({
-            "fullUrl": f"{BASE}/{resource['resourceType']}/{resource['id']}",
-            "resource": resource,
-        })
-    return bundle
+BASE = "https://fhir.example.org"
 
 
 def test_of_type_returns_only_resources_of_that_type():
