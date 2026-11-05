@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
@@ -301,3 +302,43 @@ def test_observations_frame_max_bundle_has_code_for_every_row():
 
     df = observations_frame(index)
     assert df["codes"].map(len).min() >= 1
+
+
+def test_observations_frame_reads_value_quantity():
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_observation()))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["value_type"] == "Quantity"
+    assert row["value_num"] == 80
+    assert row["value_unit"] == "/min"
+
+
+def test_observations_frame_reads_value_integer():
+    observation = make_observation(valueInteger=7)
+    del observation["valueQuantity"]
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["value_type"] == "Integer"
+    assert row["value_num"] == 7
+
+
+def test_observations_frame_reads_value_codeable_concept():
+    observation = make_observation(valueCodeableConcept={
+        "coding": [{"system": "http://loinc.org", "code": "LA33966-5", "display": "Deep sedation"}],
+        "text": "-4",
+    })
+    del observation["valueQuantity"]
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["value_type"] == "CodeableConcept"
+    assert row["value_codes"] == ["http://loinc.org|LA33966-5"]
+    assert row["value_text"] == "-4"
+    assert pd.isna(row["value_num"])

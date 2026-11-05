@@ -29,7 +29,12 @@ OBSERVATION_COLUMNS = [
     "status",
     "codes",
     "start",
-    "end"
+    "end",
+    "value_type",
+    "value_num",
+    "value_unit",
+    "value_codes",
+    "value_text"
 ]
 
 
@@ -81,6 +86,31 @@ def _codes(codeable_concept: dict) -> list[str]:
         for c in codeable_concept.get("coding", [])
     ]
 
+
+def _value(observation: Resource) -> dict:
+    value = {
+        "value_type": None,
+        "value_num": None,
+        "value_unit": None,
+        "value_codes": [],
+        "value_text": None,
+    }
+    if "valueQuantity" in observation:
+        quantity = observation["valueQuantity"]
+        value["value_type"] = "Quantity"
+        value["value_num"] = quantity.get("value")
+        value["value_unit"] = quantity.get("code")
+    elif "valueInteger" in observation:
+        value["value_type"] = "Integer"
+        value["value_num"] = observation["valueInteger"]
+    elif "valueCodeableConcept" in observation:
+        codeable_concept = observation["valueCodeableConcept"]
+        value["value_type"] = "CodeableConcept"
+        value["value_codes"] = _codes(codeable_concept)
+        value["value_text"] = codeable_concept.get("text")
+    return value
+
+
 def _observation_row(observation: Resource, index: BundleIndex) -> dict:
     patient = index.resolve(observation["subject"]["reference"])
     encounter = index.resolve(observation["encounter"]["reference"])
@@ -97,4 +127,5 @@ def _observation_row(observation: Resource, index: BundleIndex) -> dict:
         "codes": codes,
         "start": period.get("start") or effective_dt,
         "end": period.get("end"),
+        **_value(observation),
     }
