@@ -17,6 +17,11 @@ from helpers import BASE, make_bundle
 FIXTURES = Path(__file__).parent / "fixtures"
 BASE = "https://fhir.example.org"
 PATIENT = {"resourceType": "Patient", "id": "p1"}
+DEVICE_METRIC = {
+    "resourceType": "DeviceMetric",
+    "id": "dm1",
+    "category": "setting",
+}
 
 
 def make_encounter(**overrides):
@@ -175,6 +180,7 @@ def test_observations_frame_resolves_patient_and_encounters():
 @pytest.mark.parametrize("field, reference", [
     ("subject", f"{BASE}/Patient/ghost"),
     ("encounter", f"{BASE}/Encounter/ghost"),
+    ("device", f"{BASE}/DeviceMetric/ghost"),
 ])
 def test_observations_frame_fails_on_unknown_reference(field, reference):
     observation = make_observation(**{field: {"reference": reference}})
@@ -367,3 +373,39 @@ def test_observations_frame_max_bundle_value_types():
         "Integer": 24,
         "CodeableConcept": 8,
     }
+
+
+def test_observations_frame_reads_device_category():
+    observation = make_observation(device={"reference": f"{BASE}/DeviceMetric/dm1"})
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, DEVICE_METRIC, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["device_category"] == "setting"
+
+
+def test_observations_frame_from_device_category_is_none_without_device():
+    observation = make_observation(deviceCategory={})
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert pd.isna(row["device_category"])
+
+
+PEEP_PROFILE = (
+    "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
+    "StructureDefinition/mii-pr-icu-vent-positiv-endexspiratorischer-druck"
+)
+
+
+def test_observations_frame_max_bundle_distinguishes_peep_setting_and_measurement():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_1.json"))
+
+    df = observations_frame(index)
+
+    peep = df[df["profile"] == PEEP_PROFILE]
+    assert len(peep) > 0
+    assert set(peep["device_category"]) == {"setting", "measurement"}

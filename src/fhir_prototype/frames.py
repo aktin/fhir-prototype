@@ -34,7 +34,8 @@ OBSERVATION_COLUMNS = [
     "value_num",
     "value_unit",
     "value_codes",
-    "value_text"
+    "value_text",
+    "device_category"
 ]
 
 
@@ -110,13 +111,16 @@ def _value(observation: Resource) -> dict:
         value["value_text"] = codeable_concept.get("text")
     return value
 
+def _device_category(observation: Resource, index: BundleIndex) -> str | None:
+    if "device" not in observation:
+        return None
+    device = index.resolve(observation["device"]["reference"])
+    return device.get("category")
 
 def _observation_row(observation: Resource, index: BundleIndex) -> dict:
     patient = index.resolve(observation["subject"]["reference"])
     encounter = index.resolve(observation["encounter"]["reference"])
     profile = (observation.get("meta", {}).get("profile") or [None])[0]
-    codes = _codes(observation.get("code", {}))
-    effective_dt = observation.get("effectiveDateTime")
     period = observation.get("effectivePeriod", {})
     return {
         "observation_id": observation["id"],
@@ -124,8 +128,9 @@ def _observation_row(observation: Resource, index: BundleIndex) -> dict:
         "encounter_id": encounter["id"],
         "profile": profile,
         "status": observation.get("status"),
-        "codes": codes,
-        "start": period.get("start") or effective_dt,
+        "codes": _codes(observation.get("code", {})),
+        "start": period.get("start") or observation.get("effectiveDateTime"),
         "end": period.get("end"),
         **_value(observation),
+        "device_category": _device_category(observation, index),
     }
