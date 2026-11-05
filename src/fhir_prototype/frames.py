@@ -21,6 +21,12 @@ ENCOUNTER_COLUMNS = [
     "end",
 ]
 
+OBSERVATION_COLUMNS = [
+    "observation_id",
+    "patient_id",
+    "encounter_id"
+]
+
 
 def patients_frame(index: BundleIndex) -> pd.DataFrame:
     rows = [_patient_row(p) for p in index.of_type("Patient")]
@@ -56,4 +62,18 @@ def _encounter_row(encounter: Resource, index: BundleIndex) -> dict:
         "class_code": encounter.get("class", {}).get("code"),
         "start": period.get("start"),
         "end": period.get("end"),
+    }
+
+
+def observations_frame(index: BundleIndex) -> pd.DataFrame:
+    rows = [_observation_row(o, index) for o in index.of_type("Observation")]
+    return pd.DataFrame(rows, columns=OBSERVATION_COLUMNS)
+
+def _observation_row(observation: Resource, index: BundleIndex) -> dict:
+    patient = index.resolve(observation["subject"]["reference"])
+    encounter = index.resolve(observation["encounter"]["reference"])
+    return {
+        "observation_id": observation["id"],
+        "patient_id": patient["id"],
+        "encounter_id": encounter["id"],
     }

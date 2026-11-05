@@ -9,6 +9,7 @@ from fhir_prototype.frames import (
     PATIENT_COLUMNS,
     encounters_frame,
     patients_frame,
+    observations_frame, OBSERVATION_COLUMNS
 )
 from helpers import BASE, make_bundle
 
@@ -32,6 +33,25 @@ def make_encounter(**overrides):
     }
     encounter.update(overrides)
     return encounter
+
+
+ENCOUNTER = make_encounter()
+
+
+def make_observation(**overrides):
+    observation = {
+        "resourceType": "Observation",
+        "id": "o1",
+        "meta": {"profile": ["https://example.org/StructureDefinition/heartrate"]},
+        "status": "final",
+        "code": {"coding": [{"system": "http://loinc.org", "code": "8867-4"}]},
+        "subject": {"reference": f"{BASE}/Patient/p1"},
+        "encounter": {"reference": f"{BASE}/Encounter/e1"},
+        "effectiveDateTime": "2024-01-15T09:00:00+01:00",
+        "valueQuantity": {"value": 80, "unit": "/min", "code": "/min"},
+    }
+    observation.update(overrides)
+    return observation
 
 
 def test_patients_frame_has_one_row_per_patient():
@@ -138,3 +158,44 @@ def test_encounters_frame_from_fixtures(fixture, expected_end):
 
     assert len(df) == 1
     assert df.iloc[0]["end"] == expected_end
+
+
+def test_observations_frame_resolves_patient_and_encounters():
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_observation()))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["observation_id"] == "o1"
+    assert row["patient_id"] == "p1"
+    assert row["encounter_id"] == "e1"
+
+
+@pytest.mark.parametrize("field, reference", [
+    ("subject", f"{BASE}/Patient/ghost"),
+    ("encounter", f"{BASE}/Encounter/ghost"),
+])
+def test_observations_frame_fails_on_unknown_reference(field, reference):
+    observation = make_observation(**{field: {"reference": reference}})
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    with pytest.raises(UnresolvedReferenceError):
+        observations_frame(index)
+
+
+def test_observations_frame_without_observations_still_has_columns():
+    index = BundleIndex(make_bundle(PATIENT))
+
+    df = observations_frame(index)
+
+    assert df.empty
+    assert list(df.columns) == OBSERVATION_COLUMNS
+
+
+def test_observations_frame_from_fixtures():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_1.json"))
+
+    df = observations_frame(index)
+    assert len(df) == 240
+    assert df["patient_id"].nunique() == 1
+    assert df["encounter_id"].nunique() == 1
