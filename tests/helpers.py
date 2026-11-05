@@ -1,5 +1,9 @@
+from pathlib import Path
+
 BASE = "https://fhir.example.org"
 PATIENT = {"resourceType": "Patient", "id": "p1"}
+FIXTURES = Path(__file__).parent / "fixtures"
+
 
 def make_encounter(**overrides):
     encounter = {
@@ -17,8 +21,8 @@ def make_encounter(**overrides):
     encounter.update(overrides)
     return encounter
 
-ENCOUNTER = make_encounter()
 
+ENCOUNTER = make_encounter()
 
 
 def make_observation(**overrides):

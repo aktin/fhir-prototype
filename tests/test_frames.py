@@ -13,9 +13,8 @@ from fhir_prototype.frames import (
     observations_frame, OBSERVATION_COLUMNS,
     bundle_to_frames
 )
-from helpers import BASE, make_bundle, PATIENT, make_encounter, ENCOUNTER, make_observation
+from helpers import BASE, make_bundle, PATIENT, make_encounter, ENCOUNTER, make_observation, FIXTURES
 
-FIXTURES = Path(__file__).parent / "fixtures"
 BASE = "https://fhir.example.org"
 DEVICE_METRIC = {
     "resourceType": "DeviceMetric",
