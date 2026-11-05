@@ -252,3 +252,52 @@ def test_observations_frame_has_start_for_every_row_in_max_bundle():
 
     df = observations_frame(index)
     assert df["start"].notna().all()
+
+
+def test_observations_frame_has_codes_as_system_pipe_code():
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_observation()))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["codes"] == ["http://loinc.org|8867-4"]
+
+
+def test_observations_frame_keeps_all_codings_in_order():
+    observation = make_observation(code={"coding": [
+        {
+            "system": "http://snomed.info/sct",
+            "code": "260385009",
+            "display": "Negative"
+        }, {
+            "system": "https://acme.lab/resultcodes",
+            "code": "NEG",
+            "display": "Negative"
+        }
+    ]})
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["codes"] == [
+        "http://snomed.info/sct|260385009",
+        "https://acme.lab/resultcodes|NEG",
+    ]
+
+
+def test_observations_frame_codes_is_empty_list_without_code():
+    observation = make_observation()
+    del observation["code"]
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+    row = df.iloc[0]
+    assert row["codes"] == []
+
+
+def test_observations_frame_max_bundle_has_code_for_every_row():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_1.json"))
+
+    df = observations_frame(index)
+    assert df["codes"].map(len).min() >= 1

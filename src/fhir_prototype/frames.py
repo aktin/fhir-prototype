@@ -27,6 +27,7 @@ OBSERVATION_COLUMNS = [
     "encounter_id",
     "profile",
     "status",
+    "codes",
     "start",
     "end"
 ]
@@ -74,10 +75,17 @@ def observations_frame(index: BundleIndex) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=OBSERVATION_COLUMNS)
 
 
+def _codes(codeable_concept: dict) -> list[str]:
+    return [
+        f"{c['system']}|{c['code']}"
+        for c in codeable_concept.get("coding", [])
+    ]
+
 def _observation_row(observation: Resource, index: BundleIndex) -> dict:
     patient = index.resolve(observation["subject"]["reference"])
     encounter = index.resolve(observation["encounter"]["reference"])
     profile = (observation.get("meta", {}).get("profile") or [None])[0]
+    codes = _codes(observation.get("code", {}))
     effective_dt = observation.get("effectiveDateTime")
     period = observation.get("effectivePeriod", {})
     return {
@@ -86,6 +94,7 @@ def _observation_row(observation: Resource, index: BundleIndex) -> dict:
         "encounter_id": encounter["id"],
         "profile": profile,
         "status": observation.get("status"),
+        "codes": codes,
         "start": period.get("start") or effective_dt,
         "end": period.get("end"),
     }
