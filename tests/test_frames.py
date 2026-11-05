@@ -409,3 +409,26 @@ def test_observations_frame_max_bundle_distinguishes_peep_setting_and_measuremen
     peep = df[df["profile"] == PEEP_PROFILE]
     assert len(peep) > 0
     assert set(peep["device_category"]) == {"setting", "measurement"}
+
+
+def test_observations_frame_columns():
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_observation()))
+
+    df = observations_frame(index)
+
+    assert list(df.columns) == [
+        "observation_id",
+        "patient_id",
+        "encounter_id",
+        "profile",
+        "status",
+        "codes",
+        "start",
+        "end",
+        "value_type",
+        "value_num",
+        "value_unit",
+        "value_codes",
+        "value_text",
+        "device_category"
+    ]
