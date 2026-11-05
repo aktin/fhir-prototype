@@ -13,52 +13,15 @@ from fhir_prototype.frames import (
     observations_frame, OBSERVATION_COLUMNS,
     bundle_to_frames
 )
-from helpers import BASE, make_bundle
+from helpers import BASE, make_bundle, PATIENT, make_encounter, ENCOUNTER, make_observation
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BASE = "https://fhir.example.org"
-PATIENT = {"resourceType": "Patient", "id": "p1"}
 DEVICE_METRIC = {
     "resourceType": "DeviceMetric",
     "id": "dm1",
     "category": "setting",
 }
-
-
-def make_encounter(**overrides):
-    encounter = {
-        "resourceType": "Encounter",
-        "id": "e1",
-        "identifier": [{"system": "urn:eid", "value": "E-1"}],
-        "status": "finished",
-        "class": {"code": "IMP"},
-        "subject": {"reference": f"{BASE}/Patient/p1"},
-        "period": {
-            "start": "2024-01-15T09:00:00+01:00",
-            "end": "2024-01-19T12:00:00+01:00",
-        },
-    }
-    encounter.update(overrides)
-    return encounter
-
-
-ENCOUNTER = make_encounter()
-
-
-def make_observation(**overrides):
-    observation = {
-        "resourceType": "Observation",
-        "id": "o1",
-        "meta": {"profile": ["https://example.org/StructureDefinition/heartrate"]},
-        "status": "final",
-        "code": {"coding": [{"system": "http://loinc.org", "code": "8867-4"}]},
-        "subject": {"reference": f"{BASE}/Patient/p1"},
-        "encounter": {"reference": f"{BASE}/Encounter/e1"},
-        "effectiveDateTime": "2024-01-15T09:00:00+01:00",
-        "valueQuantity": {"value": 80, "unit": "/min", "code": "/min"},
-    }
-    observation.update(overrides)
-    return observation
 
 
 def test_patients_frame_has_one_row_per_patient():
@@ -433,6 +396,7 @@ def test_observations_frame_columns():
         "value_text",
         "device_category"
     ]
+
 
 def test_bundle_to_frames_builds_all_tables_from_max_bundle():
     bundle = load_bundle(FIXTURES / "bundle_max_1.json")
