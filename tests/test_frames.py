@@ -342,3 +342,28 @@ def test_observations_frame_reads_value_codeable_concept():
     assert row["value_codes"] == ["http://loinc.org|LA33966-5"]
     assert row["value_text"] == "-4"
     assert pd.isna(row["value_num"])
+
+
+def test_observations_frame_value_is_empty_without_value():
+    observation = make_observation()
+    del observation["valueQuantity"]
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert pd.isna(row["value_type"])
+    assert pd.isna(row["value_num"])
+    assert row["value_codes"] == []
+
+
+def test_observations_frame_max_bundle_value_types():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_1.json"))
+
+    df = observations_frame(index)
+
+    assert df["value_type"].value_counts().to_dict() == {
+        "Quantity": 208,
+        "Integer": 24,
+        "CodeableConcept": 8,
+    }
