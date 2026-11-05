@@ -27,7 +27,7 @@ def make_encounter(**overrides):
         "class": {"code": "IMP"},
         "subject": {"reference": f"{BASE}/Patient/p1"},
         "period": {
-            "start": "2024-01-15T08:00:00+01:00",
+            "start": "2024-01-15T09:00:00+01:00",
             "end": "2024-01-19T12:00:00+01:00",
         },
     }
@@ -115,7 +115,7 @@ def test_encounters_frame_has_one_row_per_encounter():
         "identifier_value": "E-1",
         "status": "finished",
         "class_code": "IMP",
-        "start": "2024-01-15T08:00:00+01:00",
+        "start": "2024-01-15T09:00:00+01:00",
         "end": "2024-01-19T12:00:00+01:00",
     }]
 
@@ -200,6 +200,7 @@ def test_observations_frame_from_fixtures():
     assert df["patient_id"].nunique() == 1
     assert df["encounter_id"].nunique() == 1
 
+
 def test_observations_frame_has_profile_and_status():
     index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_observation()))
 
@@ -208,6 +209,7 @@ def test_observations_frame_has_profile_and_status():
     row = df.iloc[0]
     assert row["profile"] == "https://example.org/StructureDefinition/heartrate"
     assert row["status"] == "final"
+
 
 def test_observations_frame_profile_is_none_without_meta():
     observation = make_observation()
@@ -218,3 +220,35 @@ def test_observations_frame_profile_is_none_without_meta():
 
     row = df.iloc[0]
     assert row["profile"] is None
+
+
+def test_observations_frame_takes_start_from_effective_date_time():
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_observation()))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["start"] == "2024-01-15T09:00:00+01:00"
+    assert row["end"] is None
+
+
+def test_observations_frame_takes_start_and_end_from_effective_period():
+    observation = make_observation(effectivePeriod={
+        "start": "2024-01-15T09:00:00+01:00",
+        "end": "2024-01-15T09:01:00+01:00",
+    })
+    del observation["effectiveDateTime"]
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["start"] == "2024-01-15T09:00:00+01:00"
+    assert row["end"] == "2024-01-15T09:01:00+01:00"
+
+
+def test_observations_frame_has_start_for_every_row_in_max_bundle():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_1.json"))
+
+    df = observations_frame(index)
+    assert df["start"].notna().all()

@@ -26,7 +26,9 @@ OBSERVATION_COLUMNS = [
     "patient_id",
     "encounter_id",
     "profile",
-    "status"
+    "status",
+    "start",
+    "end"
 ]
 
 
@@ -71,14 +73,19 @@ def observations_frame(index: BundleIndex) -> pd.DataFrame:
     rows = [_observation_row(o, index) for o in index.of_type("Observation")]
     return pd.DataFrame(rows, columns=OBSERVATION_COLUMNS)
 
+
 def _observation_row(observation: Resource, index: BundleIndex) -> dict:
     patient = index.resolve(observation["subject"]["reference"])
     encounter = index.resolve(observation["encounter"]["reference"])
     profile = (observation.get("meta", {}).get("profile") or [None])[0]
+    effective_dt = observation.get("effectiveDateTime")
+    period = observation.get("effectivePeriod", {})
     return {
         "observation_id": observation["id"],
         "patient_id": patient["id"],
         "encounter_id": encounter["id"],
         "profile": profile,
         "status": observation.get("status"),
+        "start": period.get("start") or effective_dt,
+        "end": period.get("end"),
     }
