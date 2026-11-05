@@ -199,3 +199,22 @@ def test_observations_frame_from_fixtures():
     assert len(df) == 240
     assert df["patient_id"].nunique() == 1
     assert df["encounter_id"].nunique() == 1
+
+def test_observations_frame_has_profile_and_status():
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_observation()))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["profile"] == "https://example.org/StructureDefinition/heartrate"
+    assert row["status"] == "final"
+
+def test_observations_frame_profile_is_none_without_meta():
+    observation = make_observation()
+    del observation["meta"]
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    df = observations_frame(index)
+
+    row = df.iloc[0]
+    assert row["profile"] is None

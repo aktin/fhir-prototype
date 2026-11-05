@@ -24,7 +24,9 @@ ENCOUNTER_COLUMNS = [
 OBSERVATION_COLUMNS = [
     "observation_id",
     "patient_id",
-    "encounter_id"
+    "encounter_id",
+    "profile",
+    "status"
 ]
 
 
@@ -72,8 +74,11 @@ def observations_frame(index: BundleIndex) -> pd.DataFrame:
 def _observation_row(observation: Resource, index: BundleIndex) -> dict:
     patient = index.resolve(observation["subject"]["reference"])
     encounter = index.resolve(observation["encounter"]["reference"])
+    profile = (observation.get("meta", {}).get("profile") or [None])[0]
     return {
         "observation_id": observation["id"],
         "patient_id": patient["id"],
         "encounter_id": encounter["id"],
+        "profile": profile,
+        "status": observation.get("status"),
     }
