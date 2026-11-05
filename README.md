@@ -6,12 +6,10 @@ will be ported to `aktin/dwh-import`.
 
 ## Pipeline
 
-1. Load a FHIR bundle (JSON) and build pandas DataFrames (patients, encounters, observations)
-2. Process and validate the DataFrames (optional)
+1. ✅ Load a FHIR bundle (JSON) and build pandas DataFrames (patients, encounters, observations)
+2. ⏳ Process and validate the DataFrames (optional)
 3. Map the DataFrames to i2b2 observation facts
 4. Import the facts into i2b2
-
-Steps 1 is in progress, steps 2 to 4 are not implemented yet.
 
 ## Setup
 
