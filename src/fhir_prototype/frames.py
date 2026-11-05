@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import pandas as pd
 
 from fhir_prototype.bundle_index import BundleIndex, Resource
@@ -37,6 +39,22 @@ OBSERVATION_COLUMNS = [
     "value_text",
     "device_category"
 ]
+
+
+@dataclass
+class BundleFrames:
+    patients: pd.DataFrame
+    encounters: pd.DataFrame
+    observations: pd.DataFrame
+
+
+def bundle_to_frames(bundle: dict) -> BundleFrames:
+    index = BundleIndex(bundle)
+    return BundleFrames(
+        patients=patients_frame(index),
+        encounters=encounters_frame(index),
+        observations=observations_frame(index),
+    )
 
 
 def patients_frame(index: BundleIndex) -> pd.DataFrame:
@@ -111,11 +129,13 @@ def _value(observation: Resource) -> dict:
         value["value_text"] = codeable_concept.get("text")
     return value
 
+
 def _device_category(observation: Resource, index: BundleIndex) -> str | None:
     if "device" not in observation:
         return None
     device = index.resolve(observation["device"]["reference"])
     return device.get("category")
+
 
 def _observation_row(observation: Resource, index: BundleIndex) -> dict:
     patient = index.resolve(observation["subject"]["reference"])

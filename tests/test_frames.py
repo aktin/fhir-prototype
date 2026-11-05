@@ -10,7 +10,8 @@ from fhir_prototype.frames import (
     PATIENT_COLUMNS,
     encounters_frame,
     patients_frame,
-    observations_frame, OBSERVATION_COLUMNS
+    observations_frame, OBSERVATION_COLUMNS,
+    bundle_to_frames
 )
 from helpers import BASE, make_bundle
 
@@ -432,3 +433,12 @@ def test_observations_frame_columns():
         "value_text",
         "device_category"
     ]
+
+def test_bundle_to_frames_builds_all_tables_from_max_bundle():
+    bundle = load_bundle(FIXTURES / "bundle_max_1.json")
+
+    frames = bundle_to_frames(bundle)
+
+    assert len(frames.patients) == 1
+    assert len(frames.encounters) == 1
+    assert len(frames.observations) == 240
