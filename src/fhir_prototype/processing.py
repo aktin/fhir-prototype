@@ -5,8 +5,16 @@ import pandas as pd
 from fhir_prototype.frames import BundleFrames
 
 
+def _to_utc(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    result = df.copy()
+    for column in columns:
+        result[column] = pd.to_datetime(result[column], utc=True)
+    return result
+
+
 def process(frames: BundleFrames) -> BundleFrames:
-    df_observations = frames.observations.copy()
-    df_observations["start"] = pd.to_datetime(df_observations["start"], utc=True)
-    df_observations["end"] = pd.to_datetime(df_observations["end"], utc=True)
-    return replace(frames, observations=df_observations)
+    return replace(
+        frames,
+        observations=_to_utc(frames.observations, ["start", "end"]),
+        encounters=_to_utc(frames.encounters, ["start", "end"]),
+    )

@@ -1,10 +1,10 @@
 import pandas as pd
 
-from fhir_prototype.bundle_index import BundleIndex
+from fhir_prototype.bundle_loader import load_bundle
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.processing import process
-from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation, FIXTURES
-from fhir_prototype.bundle_loader import load_bundle
+from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation, FIXTURES, make_encounter
+
 
 def test_process_converts_observation_start_to_utc():
     frames = bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, make_observation()))
@@ -53,3 +53,24 @@ def test_process_handles_dst_change_in_max_bundle_2():
 
     assert start_of("icu-vent-map-measured-bd30493bd56f") == pd.Timestamp("2024-03-31T00:29:00Z")
     assert start_of("icu-rass-a6170189a93b") == pd.Timestamp("2024-03-31T08:00:00Z")
+
+
+def test_process_converts_encounter_times_to_utc():
+    frames = bundle_to_frames(make_bundle(PATIENT, make_encounter()))
+
+    processed = process(frames)
+
+    row = processed.encounters.iloc[0]
+    assert row["start"] == pd.Timestamp("2024-01-15T08:00:00Z")
+    assert row["end"] == pd.Timestamp("2024-01-19T11:00:00Z")
+    assert str(processed.encounters["start"].dt.tz) == "UTC"
+    assert str(processed.encounters["end"].dt.tz) == "UTC"
+
+
+def test_process_keeps_missing_encounter_end_empty():
+    encounter = make_encounter(period={"start": "2024-06-03T14:30:00+02:00"})
+    frames = bundle_to_frames(make_bundle(PATIENT, encounter))
+
+    processed = process(frames)
+
+    assert pd.isna(processed.encounters.iloc[0]["end"])
