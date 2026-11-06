@@ -74,3 +74,31 @@ def test_process_keeps_missing_encounter_end_empty():
     processed = process(frames)
 
     assert pd.isna(processed.encounters.iloc[0]["end"])
+
+
+def test_process_parses_birth_date():
+    patient = {"resourceType": "Patient", "id": "p1", "birthDate": "2001-07-02"}
+    frames = bundle_to_frames(make_bundle(patient))
+
+    processed = process(frames)
+
+    row = processed.patients.iloc[0]
+    assert row["birth_date"] == pd.Timestamp("2001-07-02")
+    assert processed.patients["birth_date"].dt.tz is None
+
+
+def test_process_keeps_missing_birth_date_empty():
+    frames = bundle_to_frames(make_bundle(PATIENT))
+
+    processed = process(frames)
+
+    row = processed.patients.iloc[0]
+    assert pd.isna(row["birth_date"])
+
+
+def test_process_does_not_modify_input_frames():
+    frames = bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, make_observation()))
+
+    process(frames)
+
+    assert frames.observations.iloc[0]["start"] == "2024-01-15T09:00:00+01:00"
