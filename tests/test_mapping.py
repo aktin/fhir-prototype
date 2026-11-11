@@ -16,3 +16,9 @@ def test_load_mapping_has_expected_columns():
         "open_question",
         "note",
     ]
+
+
+def test_mapping_has_unique_profile_and_device_category():
+    mapping = load_mapping()
+
+    assert not mapping.duplicated(subset=["profile", "device_category"]).any()
