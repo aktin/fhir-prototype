@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
@@ -11,9 +9,10 @@ from fhir_prototype.frames import (
     encounters_frame,
     patients_frame,
     observations_frame, OBSERVATION_COLUMNS,
-    bundle_to_frames
+    bundle_to_frames,
+    procedures_frame, PROCEDURE_COLUMNS
 )
-from helpers import BASE, make_bundle, PATIENT, make_encounter, ENCOUNTER, make_observation, FIXTURES
+from helpers import BASE, make_bundle, PATIENT, make_encounter, ENCOUNTER, make_observation, FIXTURES, make_procedure
 
 BASE = "https://fhir.example.org"
 DEVICE_METRIC = {
@@ -405,3 +404,37 @@ def test_bundle_to_frames_builds_all_tables_from_max_bundle():
     assert len(frames.patients) == 1
     assert len(frames.encounters) == 1
     assert len(frames.observations) == 240
+
+
+def test_procedures_frame_has_one_row_per_procedure():
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, make_procedure()))
+
+    df = procedures_frame(index)
+
+    assert df.to_dict("records") == [{
+        "procedure_id": "pr1",
+        "patient_id": "p1",
+        "encounter_id": "e1",
+        "profile": "https://example.org/StructureDefinition/ventilation",
+        "status": "in-progress",
+        "codes": ["http://snomed.info/sct|1149092001"],
+        "start": "2024-01-15T10:00:00+01:00",
+        "end": None,
+    }]
+
+def test_procedures_frame_without_procedures_still_has_columns():
+    index = BundleIndex(make_bundle(PATIENT))
+
+    df = procedures_frame(index)
+
+    assert df.empty
+    assert list(df.columns) == PROCEDURE_COLUMNS
+
+
+def test_procedures_frame_from_max_bundle():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_1.json"))
+
+    df = procedures_frame(index)
+
+    assert len(df) == 1
+    assert df.iloc[0]["codes"] == ["http://snomed.info/sct|1149092001"]

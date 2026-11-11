@@ -50,3 +50,18 @@ def make_bundle(*resources):
             "resource": resource,
         })
     return bundle
+
+
+def make_procedure(**overrides):
+    procedure = {
+        "resourceType": "Procedure",
+        "id": "pr1",
+        "meta": {"profile": ["https://example.org/StructureDefinition/ventilation"]},
+        "status": "in-progress",
+        "code": {"coding": [{"system": "http://snomed.info/sct", "code": "1149092001"}]},
+        "subject": {"reference": f"{BASE}/Patient/p1"},
+        "encounter": {"reference": f"{BASE}/Encounter/e1"},
+        "performedPeriod": {"start": "2024-01-15T10:00:00+01:00"},
+    }
+    procedure.update(overrides)
+    return procedure

@@ -25,4 +25,5 @@ def process(frames: BundleFrames) -> BundleFrames:
         patients=_parse_dates(frames.patients, ["birth_date"]),
         observations=_to_utc(frames.observations, ["start", "end"]),
         encounters=_to_utc(frames.encounters, ["start", "end"]),
+        procedures=_to_utc(frames.procedures, ["start", "end"]),
     )

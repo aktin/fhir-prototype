@@ -40,12 +40,24 @@ OBSERVATION_COLUMNS = [
     "device_category"
 ]
 
+PROCEDURE_COLUMNS = [
+    "procedure_id",
+    "patient_id",
+    "encounter_id",
+    "profile",
+    "status",
+    "codes",
+    "start",
+    "end"
+]
+
 
 @dataclass
 class BundleFrames:
     patients: pd.DataFrame
     encounters: pd.DataFrame
     observations: pd.DataFrame
+    procedures: pd.DataFrame
 
 
 def bundle_to_frames(bundle: dict) -> BundleFrames:
@@ -54,6 +66,7 @@ def bundle_to_frames(bundle: dict) -> BundleFrames:
         patients=patients_frame(index),
         encounters=encounters_frame(index),
         observations=observations_frame(index),
+        procedures=procedures_frame(index),
     )
 
 
@@ -137,16 +150,19 @@ def _device_category(observation: Resource, index: BundleIndex) -> str | None:
     return device.get("category")
 
 
+def _profile(resource: Resource) -> str | None:
+    return (resource.get("meta", {}).get("profile") or [None])[0]
+
+
 def _observation_row(observation: Resource, index: BundleIndex) -> dict:
     patient = index.resolve(observation["subject"]["reference"])
     encounter = index.resolve(observation["encounter"]["reference"])
-    profile = (observation.get("meta", {}).get("profile") or [None])[0]
     period = observation.get("effectivePeriod", {})
     return {
         "observation_id": observation["id"],
         "patient_id": patient["id"],
         "encounter_id": encounter["id"],
-        "profile": profile,
+        "profile": _profile(observation),
         "status": observation.get("status"),
         "codes": _codes(observation.get("code", {})),
         "start": period.get("start") or observation.get("effectiveDateTime"),
@@ -154,3 +170,24 @@ def _observation_row(observation: Resource, index: BundleIndex) -> dict:
         **_value(observation),
         "device_category": _device_category(observation, index),
     }
+
+
+def _procedure_row(procedure: Resource, index: BundleIndex) -> dict:
+    patient = index.resolve(procedure["subject"]["reference"])
+    encounter = index.resolve(procedure["encounter"]["reference"])
+    period = procedure.get("performedPeriod", {})
+    return {
+        "procedure_id": procedure["id"],
+        "patient_id": patient["id"],
+        "encounter_id": encounter["id"],
+        "profile": _profile(procedure),
+        "status": procedure.get("status"),
+        "codes": _codes(procedure.get("code", {})),
+        "start": period.get("start"),
+        "end": period.get("end"),
+    }
+
+
+def procedures_frame(index: BundleIndex) -> pd.DataFrame:
+    rows = [_procedure_row(p, index) for p in index.of_type("Procedure")]
+    return pd.DataFrame(rows, columns=PROCEDURE_COLUMNS)

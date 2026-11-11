@@ -3,7 +3,7 @@ import pandas as pd
 from fhir_prototype.bundle_loader import load_bundle
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.processing import process
-from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation, FIXTURES, make_encounter
+from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation, FIXTURES, make_encounter, make_procedure
 
 
 def test_process_converts_observation_start_to_utc():
@@ -102,3 +102,14 @@ def test_process_does_not_modify_input_frames():
     process(frames)
 
     assert frames.observations.iloc[0]["start"] == "2024-01-15T09:00:00+01:00"
+
+
+def test_process_converts_procedure_times_to_utc():
+    frames = bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, make_procedure()))
+
+    processed = process(frames)
+
+    row = processed.procedures.iloc[0]
+    assert row["start"] == pd.Timestamp("2024-01-15T09:00:00Z")
+    assert pd.isna(row["end"])
+    assert str(processed.procedures["start"].dt.tz) == "UTC"
