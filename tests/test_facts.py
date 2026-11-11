@@ -1,10 +1,11 @@
 import pandas as pd
 
-from fhir_prototype.facts import observation_facts
+from fhir_prototype.bundle_loader import load_bundle
+from fhir_prototype.facts import observation_facts, split_unmapped
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.mapping import load_mapping
 from fhir_prototype.processing import process
-from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation
+from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation, FIXTURES
 
 HEART_RATE_PROFILE = (
     "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
@@ -85,3 +86,23 @@ def test_observation_facts_has_fact_columns():
     row = facts.iloc[0]
     assert row["modifier_cd"] == "@"
     assert row["start_date"] == pd.Timestamp("2024-01-15T08:00:00Z")
+
+
+def test_split_unmapped_separates_rows_without_concept():
+    mapped = make_observation(id="o1", meta={"profile": [HEART_RATE_PROFILE]})
+    unmapped = make_observation(id="o2")
+    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, mapped, unmapped)))
+
+    result = split_unmapped(observation_facts(frames.observations, load_mapping()))
+
+    assert list(result.facts["observation_id"]) == ["o1"]
+    assert list(result.unmapped["observation_id"]) == ["o2"]
+
+
+def test_split_unmapped_counts_in_max_bundle():
+    frames = process(bundle_to_frames(load_bundle(FIXTURES / "bundle_max_1.json")))
+
+    result = split_unmapped(observation_facts(frames.observations, load_mapping()))
+
+    assert len(result.facts) == 168
+    assert len(result.unmapped) == 72

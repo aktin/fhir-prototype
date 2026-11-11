@@ -1,4 +1,13 @@
+from dataclasses import dataclass
+
 import pandas as pd
+
+
+@dataclass
+class MappingResult:
+    facts: pd.DataFrame
+    unmapped: pd.DataFrame
+
 
 FACT_COLUMNS = [
     "observation_id",
@@ -12,6 +21,10 @@ FACT_COLUMNS = [
     "nval_num",
     "units_cd",
 ]
+
+def split_unmapped(facts: pd.DataFrame) -> MappingResult:
+    unmapped = facts["concept_cd"].isna()
+    return MappingResult(facts=facts[~unmapped], unmapped=facts[unmapped])
 
 
 def observation_facts(observations: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
