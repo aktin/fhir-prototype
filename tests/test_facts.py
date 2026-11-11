@@ -111,8 +111,8 @@ def test_split_unmapped_counts_in_max_bundle():
 
     result = split_unmapped(observation_facts(frames.observations, load_mapping()))
 
-    assert len(result.facts) == 168
-    assert len(result.unmapped) == 72
+    assert len(result.facts) == 200
+    assert len(result.unmapped) == 40
 
 
 def test_procedure_facts_uses_code_as_concept_without_value():
@@ -136,6 +136,6 @@ def test_build_facts_combines_observations_and_procedures():
 
     result = build_facts(frames, load_mapping())
 
-    assert len(result.facts) == 169
-    assert len(result.unmapped) == 72
+    assert len(result.facts) == 201
+    assert len(result.unmapped) == 40
     assert set(result.facts["resource_type"]) == {"Observation", "Procedure"}
