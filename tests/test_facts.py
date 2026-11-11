@@ -11,6 +11,10 @@ HEART_RATE_PROFILE = (
     "StructureDefinition/mii-pr-icu-muv-herzfrequenz"
 )
 
+RASS_PROFILE = (
+    "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
+    "StructureDefinition/mii-pr-icu-score-rass"
+)
 
 def test_observation_facts_assigns_concept_from_mapping():
     observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
@@ -41,3 +45,19 @@ def test_observation_facts_puts_numeric_value_into_nval_num():
     assert row["valtype_cd"] == "N"
     assert row["nval_num"] == 80
     assert row["units_cd"] == "/min"
+
+
+def test_observation_facts_reads_rass_score_from_value_text():
+    observation = make_observation(
+        meta={"profile": [RASS_PROFILE]},
+        valueCodeableConcept={
+            "coding": [{"system": "http://loinc.org", "code": "LA33966-5"}],
+            "text": "-4",
+        },
+    )
+    del observation["valueQuantity"]
+    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
+
+    facts = observation_facts(frames.observations, load_mapping())
+
+    assert facts.iloc[0]["nval_num"] == -4
