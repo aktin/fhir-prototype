@@ -10,7 +10,8 @@ class MappingResult:
 
 
 FACT_COLUMNS = [
-    "observation_id",
+    "resource_type",
+    "resource_id",
     "patient_id",
     "encounter_id",
     "concept_cd",
@@ -29,9 +30,10 @@ def split_unmapped(facts: pd.DataFrame) -> MappingResult:
 
 def observation_facts(observations: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
     facts = observations.merge(mapping, on=["profile", "device_category"], how="left")
-    facts = facts.rename(columns={"start": "start_date", "end": "end_date"})
+    facts = facts.rename(columns={"observation_id": "resource_id", "start": "start_date", "end": "end_date"})
     facts["modifier_cd"] = "@"
     facts["nval_num"] = facts["value_num"]
+    facts["resource_type"] = "Observation"
     from_text = facts["value_column"] == "value_text"
     facts.loc[from_text, "nval_num"] = pd.to_numeric(
         facts.loc[from_text, "value_text"], errors="coerce"

@@ -72,7 +72,8 @@ def test_observation_facts_has_fact_columns():
     facts = observation_facts(frames.observations, load_mapping())
 
     assert list(facts.columns) == [
-        "observation_id",
+        "resource_type",
+        "resource_id",
         "patient_id",
         "encounter_id",
         "concept_cd",
@@ -84,6 +85,7 @@ def test_observation_facts_has_fact_columns():
         "units_cd",
     ]
     row = facts.iloc[0]
+    assert row["resource_type"] == "Observation"
     assert row["modifier_cd"] == "@"
     assert row["start_date"] == pd.Timestamp("2024-01-15T08:00:00Z")
 
@@ -95,8 +97,8 @@ def test_split_unmapped_separates_rows_without_concept():
 
     result = split_unmapped(observation_facts(frames.observations, load_mapping()))
 
-    assert list(result.facts["observation_id"]) == ["o1"]
-    assert list(result.unmapped["observation_id"]) == ["o2"]
+    assert list(result.facts["resource_id"]) == ["o1"]
+    assert list(result.unmapped["resource_id"]) == ["o2"]
 
 
 def test_split_unmapped_counts_in_max_bundle():
