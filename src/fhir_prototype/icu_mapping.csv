@@ -1,4 +1,4 @@
-resource_type,profile,device_category,concept_cd,valtype_cd,value_column,units_cd,status,open_question,note
+resource_type,profile,device_category,concept_cd,valtype_cd,value_column,expected_unit,status,open_question,note
 Procedure,https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/StructureDefinition/mii-pr-icu-beatmung,,SNOMED:1149092001,,,,vorgeschlagen,Welches Präfix für SNOMED-Konzepte (SNOMED: oder anderes)?,"Analog Diagnosen in der Notaufnahme: Code als Konzept, ohne Wert; Zeitraum aus performedPeriod"
 Observation,https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/StructureDefinition/mii-pr-icu-score-rass,,,N,value_text,,offen,Kein LOINC für den Score (nur SNOMED:1345050000). Eigener Code (ICU:RASS) oder SNOMED?,"Skalenwert steht in valueCodeableConcept.text, als Zahl speichern (analog GCS/Rankin in Notaufnahme)"
 Observation,https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/StructureDefinition/mii-pr-icu-score-numerische-ratingskala,,LOINC:72514-3,N,value_num,,offen,Gemeinsames Konzept mit Notaufnahme?,Identisch zu Schmerzskala in AKTIN Notaufnahme

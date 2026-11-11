@@ -16,7 +16,7 @@ def test_load_mapping_has_expected_columns():
         "concept_cd",
         "valtype_cd",
         "value_column",
-        "units_cd",
+        "expected_unit",
         "status",
         "open_question",
         "note",
