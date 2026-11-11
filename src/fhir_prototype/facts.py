@@ -40,3 +40,14 @@ def observation_facts(observations: pd.DataFrame, mapping: pd.DataFrame) -> pd.D
     )
     facts["units_cd"] = facts["value_unit"]
     return facts[FACT_COLUMNS]
+
+
+def procedure_facts(procedures: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
+    mapping = mapping[mapping["resource_type"] == "Procedure"]
+    facts = procedures.merge(mapping, on="profile", how="left")
+    facts = facts.rename(columns={"procedure_id": "resource_id", "start": "start_date", "end": "end_date"})
+    facts["resource_type"] = "Procedure"
+    facts["modifier_cd"] = "@"
+    facts["nval_num"] = None
+    facts["units_cd"] = None
+    return facts[FACT_COLUMNS]
