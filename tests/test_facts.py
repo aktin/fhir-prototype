@@ -16,6 +16,7 @@ RASS_PROFILE = (
     "StructureDefinition/mii-pr-icu-score-rass"
 )
 
+
 def test_observation_facts_assigns_concept_from_mapping():
     observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
@@ -61,3 +62,26 @@ def test_observation_facts_reads_rass_score_from_value_text():
     facts = observation_facts(frames.observations, load_mapping())
 
     assert facts.iloc[0]["nval_num"] == -4
+
+
+def test_observation_facts_has_fact_columns():
+    observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
+    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
+
+    facts = observation_facts(frames.observations, load_mapping())
+
+    assert list(facts.columns) == [
+        "observation_id",
+        "patient_id",
+        "encounter_id",
+        "concept_cd",
+        "modifier_cd",
+        "start_date",
+        "end_date",
+        "valtype_cd",
+        "nval_num",
+        "units_cd",
+    ]
+    row = facts.iloc[0]
+    assert row["modifier_cd"] == "@"
+    assert row["start_date"] == pd.Timestamp("2024-01-15T08:00:00Z")
