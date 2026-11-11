@@ -1,7 +1,7 @@
 import pandas as pd
 
 from fhir_prototype.bundle_loader import load_bundle
-from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts
+from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.mapping import load_mapping
 from fhir_prototype.processing import process
@@ -129,3 +129,13 @@ def test_procedure_facts_uses_code_as_concept_without_value():
     assert row["modifier_cd"] == "@"
     assert row["start_date"] == pd.Timestamp("2024-01-15T09:00:00Z")
     assert pd.isna(row["nval_num"])
+
+
+def test_build_facts_combines_observations_and_procedures():
+    frames = process(bundle_to_frames(load_bundle(FIXTURES / "bundle_max_1.json")))
+
+    result = build_facts(frames, load_mapping())
+
+    assert len(result.facts) == 169
+    assert len(result.unmapped) == 72
+    assert set(result.facts["resource_type"]) == {"Observation", "Procedure"}

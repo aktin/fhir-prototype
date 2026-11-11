@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from fhir_prototype.frames import BundleFrames
+
 
 @dataclass
 class MappingResult:
@@ -22,6 +24,7 @@ FACT_COLUMNS = [
     "nval_num",
     "units_cd",
 ]
+
 
 def split_unmapped(facts: pd.DataFrame) -> MappingResult:
     unmapped = facts["concept_cd"].isna()
@@ -51,3 +54,14 @@ def procedure_facts(procedures: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataF
     facts["nval_num"] = None
     facts["units_cd"] = None
     return facts[FACT_COLUMNS]
+
+
+def build_facts(frames: BundleFrames, mapping: pd.DataFrame) -> MappingResult:
+    facts = pd.concat(
+        [
+            observation_facts(frames.observations, mapping),
+            procedure_facts(frames.procedures, mapping),
+        ],
+        ignore_index=True,
+    )
+    return split_unmapped(facts)
