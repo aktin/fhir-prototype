@@ -9,21 +9,6 @@ from fhir_prototype.facts import FACT_COLUMNS, _first, _row, _split, build_facts
 from fhir_prototype.mapping import load_mapping
 from helpers import BASE, ENCOUNTER, FIXTURES, PATIENT, make_bundle, make_observation, make_procedure
 
-HEART_RATE_PROFILE = (
-    "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
-    "StructureDefinition/mii-pr-icu-muv-herzfrequenz"
-)
-
-RASS_PROFILE = (
-    "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
-    "StructureDefinition/mii-pr-icu-score-rass"
-)
-
-VENTILATION_PROFILE = (
-    "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
-    "StructureDefinition/mii-pr-icu-beatmung"
-)
-
 START = "effectivePeriod.start | effectiveDateTime"
 
 
@@ -114,6 +99,7 @@ def test_row_translates_observation_by_rule():
         "end_date": None,
         "valtype_cd": "N",
         "tval_char": None,
+        "alt_codes": [],
         "nval_num": 80,
         "units_cd": "/min",
         "expected_unit": "/min",
@@ -181,6 +167,7 @@ def make_fact(**overrides):
         "end_date": None,
         "valtype_cd": "N",
         "tval_char": None,
+        "alt_codes": [],
         "nval_num": 80,
         "units_cd": "/min",
         "expected_unit": "/min",
@@ -397,3 +384,37 @@ def test_build_facts_handles_dst_change_in_max_bundle_2():
     assert str(result.facts["start_date"].dt.tz) == "UTC"
     assert start_of(result.facts, "icu-rass-a6170189a93b") == pd.Timestamp("2024-03-31T08:00:00Z")
     assert start_of(result.unmapped, "icu-vent-map-measured-bd30493bd56f") == pd.Timestamp("2024-03-31T00:29:00Z")
+
+
+ALT_RULE = {**RULE, "alt_codes": ["LOINC:8310-5", "SNOMED:386725007"]}
+
+
+def test_build_facts_adds_alt_code_row_per_alternative_code():
+    result = facts_of(make_observation(), rules=[ALT_RULE])
+
+    facts = result.facts
+    assert facts["modifier_cd"].tolist() == ["@", "altCode", "altCode"]
+    assert facts["valtype_cd"].tolist() == ["N", "T", "T"]
+    assert facts["tval_char"].tolist()[1:] == ["LOINC:8310-5", "SNOMED:386725007"]
+    assert pd.isna(facts["tval_char"].iloc[0])
+    assert facts["concept_cd"].tolist() == ["LOINC:8867-4"] * 3
+    assert facts["resource_id"].tolist() == ["o1"] * 3
+    assert facts["start_date"].nunique() == 1
+    assert facts["nval_num"].iloc[0] == 80
+    assert facts["nval_num"].iloc[1:].isna().all()
+    assert facts["units_cd"].iloc[1:].isna().all()
+
+
+def test_build_facts_adds_no_alt_code_rows_for_rejected_fact():
+    observation = make_observation(valueQuantity={"value": 80, "unit": "/h", "code": "/h"})
+
+    result = facts_of(observation, rules=[ALT_RULE])
+
+    assert len(result.facts) == 0
+    assert len(result.unmapped) == 1
+
+
+def test_build_facts_adds_no_alt_code_rows_without_alternative_codes():
+    result = facts_of(make_observation())
+
+    assert result.facts["modifier_cd"].tolist() == ["@"]

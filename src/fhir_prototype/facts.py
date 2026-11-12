@@ -32,6 +32,7 @@ FACT_COLUMNS = [
 ]
 FACT_RESOURCE_TYPES = ["Observation", "Procedure"]
 EXCLUDED_STATUS = {"entered-in-error", "cancelled", "not-done"}
+ALT_CODE_MODIFIER = "altCode"
 
 
 def _first(resource: Resource, path: str | None) -> Any:
@@ -58,8 +59,20 @@ def _row(resource: Resource, index: BundleIndex, rule: dict) -> dict:
         "nval_num": _first(resource, rule.get("value")),
         "units_cd": _first(resource, rule.get("unit")),
         "expected_unit": rule.get("expected_unit"),
-        #        "alt_codes": rule.get("alt_codes") or [],
+        "alt_codes": rule.get("alt_codes") or [],
     }
+
+
+def _alt_code_facts(facts: pd.DataFrame) -> pd.DataFrame:
+    """Return one modifier row per alternative code of each fact, without the value of the fact."""
+    rows = facts.explode("alt_codes").dropna(subset="alt_codes")
+    return rows.assign(
+        modifier_cd=ALT_CODE_MODIFIER,
+        valtype_cd="T",
+        tval_char=rows["alt_codes"],
+        nval_num=float("nan"),
+        units_cd=None,
+    )
 
 
 def _split(facts: pd.DataFrame) -> MappingResult:
@@ -72,9 +85,10 @@ def _split(facts: pd.DataFrame) -> MappingResult:
     rejected = reason.notna()
     accepted = facts[~rejected]
     return MappingResult(
-        facts=accepted[FACT_COLUMNS],
+        facts=pd.concat([accepted, _alt_code_facts(accepted)], ignore_index=True)[FACT_COLUMNS],
         unmapped=facts.loc[rejected, FACT_COLUMNS].assign(reason=reason[rejected]),
     )
+
 
 def build_facts(index: BundleIndex, mapping: list[dict]) -> MappingResult:
     """Translate the resources of a bundle into i2b2 facts as defined by the mapping."""
@@ -85,7 +99,7 @@ def build_facts(index: BundleIndex, mapping: list[dict]) -> MappingResult:
         for resource in index.of_type(resource_type)
         if resource.get("status") not in EXCLUDED_STATUS
     ]
-    facts = pd.DataFrame(rows, columns=FACT_COLUMNS + ["expected_unit"])
+    facts = pd.DataFrame(rows, columns=FACT_COLUMNS + ["expected_unit", "alt_codes"])
     numeric = facts["valtype_cd"] == "N"
     facts["nval_num"] = pd.to_numeric(facts["nval_num"], errors="coerce").where(numeric)
     return _split(to_datetime(facts, ["start_date", "end_date"]))
