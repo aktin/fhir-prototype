@@ -6,7 +6,7 @@ from fhir_prototype.facts import MappingResult, build_facts
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.importer import Importer
 from fhir_prototype.mapping import load_mapping
-from fhir_prototype.processing import process
+from fhir_prototype.dates import parse_dates
 from fhir_prototype.validation import BundleValidator, NoValidation
 
 
@@ -20,7 +20,7 @@ def run(
     if not validator.is_valid(bundle):
         raise InvalidBundleError(f"Bundle {bundle_path} failed validation")
     index = BundleIndex(bundle)
-    frames = process(bundle_to_frames(index))
+    frames = parse_dates(bundle_to_frames(index))
     result = build_facts(index, load_mapping())
     importer.write(frames, result)
     return result

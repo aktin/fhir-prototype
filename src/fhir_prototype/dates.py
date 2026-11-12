@@ -12,7 +12,7 @@ def to_datetime(df: pd.DataFrame, columns: list[str], *, utc=True) -> pd.DataFra
     return result
 
 
-def process(frames: BundleFrames) -> BundleFrames:
+def parse_dates(frames: BundleFrames) -> BundleFrames:
     return replace(
         frames,
         patients=to_datetime(frames.patients, ["birth_date"], utc=False),

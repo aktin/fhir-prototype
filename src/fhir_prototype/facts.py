@@ -6,7 +6,7 @@ import pandas as pd
 from fhirpathpy import evaluate
 
 from fhir_prototype.bundle_index import BundleIndex, Resource
-from fhir_prototype.processing import to_datetime
+from fhir_prototype.dates import to_datetime
 
 
 @dataclass

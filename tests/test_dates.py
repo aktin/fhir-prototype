@@ -3,17 +3,17 @@ from helpers import PATIENT, make_bundle, make_encounter
 
 from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.frames import bundle_to_frames
-from fhir_prototype.processing import process, to_datetime
+from fhir_prototype.dates import parse_dates, to_datetime
 
 
 def frames_of(*resources):
     return bundle_to_frames(BundleIndex(make_bundle(*resources)))
 
 
-def test_process_converts_encounter_times_to_utc():
+def test_parse_dates_converts_encounter_times_to_utc():
     frames = frames_of(PATIENT, make_encounter())
 
-    processed = process(frames)
+    processed = parse_dates(frames)
 
     row = processed.encounters.iloc[0]
     assert row["start"] == pd.Timestamp("2024-01-15T08:00:00Z")
@@ -22,39 +22,39 @@ def test_process_converts_encounter_times_to_utc():
     assert str(processed.encounters["end"].dt.tz) == "UTC"
 
 
-def test_process_keeps_missing_encounter_end_empty():
+def test_parse_dates_keeps_missing_encounter_end_empty():
     encounter = make_encounter(period={"start": "2024-06-03T14:30:00+02:00"})
     frames = frames_of(PATIENT, encounter)
 
-    processed = process(frames)
+    processed = parse_dates(frames)
 
     assert pd.isna(processed.encounters.iloc[0]["end"])
 
 
-def test_process_parses_birth_date():
+def test_parse_dates_parses_birth_date():
     patient = {"resourceType": "Patient", "id": "p1", "birthDate": "2001-07-02"}
     frames = frames_of(patient)
 
-    processed = process(frames)
+    processed = parse_dates(frames)
 
     row = processed.patients.iloc[0]
     assert row["birth_date"] == pd.Timestamp("2001-07-02")
     assert processed.patients["birth_date"].dt.tz is None
 
 
-def test_process_keeps_missing_birth_date_empty():
+def test_parse_dates_keeps_missing_birth_date_empty():
     frames = frames_of(PATIENT)
 
-    processed = process(frames)
+    processed = parse_dates(frames)
 
     row = processed.patients.iloc[0]
     assert pd.isna(row["birth_date"])
 
 
-def test_process_does_not_modify_input_frames():
+def test_parse_dates_does_not_modify_input_frames():
     frames = frames_of(PATIENT, make_encounter())
 
-    process(frames)
+    parse_dates(frames)
 
     assert frames.encounters.iloc[0]["start"] == "2024-01-15T09:00:00+01:00"
 
