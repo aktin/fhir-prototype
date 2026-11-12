@@ -1,5 +1,7 @@
 from typing import Any
 
+from fhir_prototype.bundle_loader import InvalidBundleError
+
 Resource = dict[str, Any]
 
 
@@ -12,7 +14,11 @@ class BundleIndex:
 
     def __init__(self, bundle: dict[str, Any]) -> None:
         self._by_full_url: dict[str, Resource] = {}
-        for entry in bundle.get("entry", []):
+        for position, entry in enumerate(bundle.get("entry", [])):
+            if "fullUrl" not in entry or "resource" not in entry:
+                raise InvalidBundleError(f"Entry {position} lacks fullUrl or resource")
+            if entry["fullUrl"] in self._by_full_url:
+                raise InvalidBundleError(f"Entry {position} repeats fullUrl {entry['fullUrl']!r}")
             self._by_full_url[entry["fullUrl"]] = entry["resource"]
 
     def of_type(self, resource_type: str) -> list[Resource]:

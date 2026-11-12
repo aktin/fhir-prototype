@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
-from fhir_prototype.bundle_loader import load_bundle
+from fhir_prototype.bundle_loader import load_bundle, InvalidBundleError
 from helpers import make_bundle
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -60,3 +60,30 @@ def test_all_observation_references_resolve_in_max_bundle():
         assert index.resolve(obs["encounter"]["reference"])["resourceType"] == "Encounter"
         if "device" in obs:
             assert index.resolve(obs["device"]["reference"])["resourceType"] == "DeviceMetric"
+
+
+def test_rejects_entry_without_full_url():
+    bundle = make_bundle({"resourceType": "Patient", "id": "p1"},
+                         {"resourceType": "Observation", "id": "o1"})
+    del bundle["entry"][1]["fullUrl"]
+
+    with pytest.raises(InvalidBundleError, match="Entry 1"):
+        BundleIndex(bundle)
+
+
+def test_rejects_entry_without_resource():
+    bundle = make_bundle({"resourceType": "Patient", "id": "p1"},
+                         {"resourceType": "Observation", "id": "o1"})
+    del bundle["entry"][1]["resource"]
+
+    with pytest.raises(InvalidBundleError, match="Entry 1"):
+        BundleIndex(bundle)
+
+
+def test_rejects_repeated_full_url():
+    first = {"resourceType": "Patient", "id": "p1", "gender": "female"}
+    second = {"resourceType": "Patient", "id": "p1", "gender": "male"}
+    bundle = make_bundle(first, second)
+
+    with pytest.raises(InvalidBundleError, match=f"Entry 1 repeats.*{BASE}/Patient/p1"):
+        BundleIndex(bundle)
