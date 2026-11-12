@@ -1,7 +1,11 @@
+import copy
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
+from fhirpathpy import evaluate
 
+from fhir_prototype.bundle_index import Resource
 from fhir_prototype.frames import BundleFrames
 
 
@@ -25,6 +29,12 @@ FACT_COLUMNS = [
     "units_cd",
 ]
 
+def _first(resource: Resource, path: str | None) -> Any:
+    """Return the first result of a FHIRPath expression, or None without path or match."""
+    if not path:
+        return None
+    # evaluate adds type information to its input, so it works on a copy
+    return next(iter(evaluate(copy.deepcopy(resource), path)), None)
 
 def split_unmapped(facts: pd.DataFrame) -> MappingResult:
     unmapped = facts["concept_cd"].isna()

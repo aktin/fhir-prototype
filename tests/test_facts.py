@@ -1,7 +1,11 @@
-import pandas as pd
+import copy
 
+import pandas as pd
+import pytest
+
+from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.bundle_loader import load_bundle
-from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts
+from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts, _first
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.mapping import load_mapping
 from fhir_prototype.processing import process
@@ -139,3 +143,63 @@ def test_build_facts_combines_observations_and_procedures():
     assert len(result.facts) == 201
     assert len(result.unmapped) == 40
     assert set(result.facts["resource_type"]) == {"Observation", "Procedure"}
+
+
+START = "effectivePeriod.start | effectiveDateTime"
+
+
+def test_first_returns_value_at_path():
+    observation = make_observation()
+
+    assert _first(observation, "valueQuantity.value") == 80
+    assert _first(observation, "valueQuantity.code") == "/min"
+
+
+def test_first_returns_none_without_path_or_match():
+    observation = make_observation()
+
+    assert _first(observation, None) is None
+    assert _first(observation, "") is None
+    assert _first(observation, "valueInteger") is None
+
+
+def test_first_reads_start_from_datetime_or_period():
+    with_datetime = make_observation()
+    with_period = make_observation(effectivePeriod={
+        "start": "2024-01-15T10:00:00+01:00",
+        "end": "2024-01-15T10:01:00+01:00",
+    })
+    del with_period["effectiveDateTime"]
+
+    assert _first(with_datetime, START) == "2024-01-15T09:00:00+01:00"
+    assert _first(with_period, START) == "2024-01-15T10:00:00+01:00"
+
+
+def test_first_does_not_modify_resource():
+    observation = make_observation()
+    before = copy.deepcopy(observation)
+
+    _first(observation, "valueQuantity.value")
+
+    assert observation == before
+
+
+@pytest.mark.parametrize("fixture", [
+    "bundle_min.json",
+    "bundle_max_1.json",
+    "bundle_max_2.json",
+])
+def test_fhirpath_expressions_evaluate_on_fixtures(fixture):
+    index = BundleIndex(load_bundle(FIXTURES / fixture))
+
+    for observation in index.of_type("Observation"):
+        assert _first(observation, START) is not None
+        values = [
+            _first(observation, "valueQuantity.value"),
+            _first(observation, "valueInteger"),
+            _first(observation, "valueCodeableConcept.text"),
+        ]
+        assert sum(value is not None for value in values) == 1
+
+    for procedure in index.of_type("Procedure"):
+        assert _first(procedure, "performedPeriod.start | performedDateTime") is not None
