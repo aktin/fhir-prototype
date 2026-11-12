@@ -5,25 +5,18 @@ import pandas as pd
 from fhir_prototype.frames import BundleFrames
 
 
-def _to_utc(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+def parse_dates(df: pd.DataFrame, columns: list[str], *, utc=False) -> pd.DataFrame:
     result = df.copy()
     for column in columns:
-        result[column] = pd.to_datetime(result[column], utc=True)
-    return result
-
-
-def _parse_dates(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    result = df.copy()
-    for column in columns:
-        result[column] = pd.to_datetime(result[column])
+        result[column] = pd.to_datetime(result[column], utc=utc)
     return result
 
 
 def process(frames: BundleFrames) -> BundleFrames:
     return replace(
         frames,
-        patients=_parse_dates(frames.patients, ["birth_date"]),
-        observations=_to_utc(frames.observations, ["start", "end"]),
-        encounters=_to_utc(frames.encounters, ["start", "end"]),
-        procedures=_to_utc(frames.procedures, ["start", "end"]),
+        patients=parse_dates(frames.patients, ["birth_date"]),
+        observations=parse_dates(frames.observations, ["start", "end"], utc=True),
+        encounters=parse_dates(frames.encounters, ["start", "end"], utc=True),
+        procedures=parse_dates(frames.procedures, ["start", "end"], utc=True),
     )
