@@ -25,7 +25,7 @@ uv run pytest
 Run steps 1 to 3 for one bundle and write the result as CSV:
 
 ```bash
-uv run python -c "from fhir_prototype.pipeline import run; run('tests/fixtures/bundle_max_1.json', 'output')"
+uv run python -c "from fhir_prototype.importer import CsvImporter; from fhir_prototype.pipeline import run; run('tests/fixtures/bundle_max_1.json', CsvImporter('output'))"
 ```
 
 The first argument is the bundle file, the second is the output folder. It is
