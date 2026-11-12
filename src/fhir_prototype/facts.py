@@ -55,6 +55,20 @@ def _row(resource: Resource, index: BundleIndex, rule: dict) -> dict:
 #        "alt_codes": rule.get("alt_codes") or [],
     }
 
+def _split(facts: pd.DataFrame) -> MappingResult:
+    """Separate the rows that cannot be imported and name the reason for each."""
+    reason = pd.Series(None, index=facts.index, dtype=object)
+    differs = facts["units_cd"].notna() & facts["expected_unit"].notna() & (facts["units_cd"] != facts["expected_unit"])
+    reason[differs] = "unit differs from expected_unit"
+    reason[(facts["valtype_cd"] == "N") & facts["nval_num"].isna()] = "no numeric value"
+    reason[facts["concept_cd"].isna()] = "no concept in mapping"
+    rejected = reason.notna()
+    accepted = facts[~rejected]
+    return MappingResult(
+        facts=accepted[FACT_COLUMNS],
+        unmapped=facts.loc[rejected, FACT_COLUMNS].assign(reason=reason[rejected]),
+    )
+
 def split_unmapped(facts: pd.DataFrame) -> MappingResult:
     unmapped = facts["concept_cd"].isna()
     return MappingResult(facts=facts[~unmapped], unmapped=facts[unmapped])
@@ -94,3 +108,4 @@ def build_facts(frames: BundleFrames, mapping: pd.DataFrame) -> MappingResult:
         ignore_index=True,
     )
     return split_unmapped(facts)
+

@@ -6,7 +6,7 @@ import pytest
 from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.bundle_loader import load_bundle
 from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts, _first, \
-    _row
+    _row, _split
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.mapping import load_csv_mapping
 from fhir_prototype.processing import process
@@ -289,3 +289,87 @@ def test_row_without_rule_keeps_identity_but_has_no_concept():
     assert row["concept_cd"] is None
     assert row["nval_num"] is None
     assert row["start_date"] is None
+
+
+def make_fact(**overrides):
+    fact = {
+        "resource_type": "Observation",
+        "resource_id": "o1",
+        "patient_id": "p1",
+        "encounter_id": "e1",
+        "concept_cd": "LOINC:8867-4",
+        "modifier_cd": "@",
+        "start_date": "2024-01-15T09:00:00+01:00",
+        "end_date": None,
+        "valtype_cd": "N",
+        "tval_char": None,
+        "nval_num": 80,
+        "units_cd": "/min",
+        "expected_unit": "/min",
+    }
+    fact.update(overrides)
+    return fact
+
+
+def test_split_accepts_complete_fact():
+    result = _split(pd.DataFrame([make_fact()]))
+
+    assert len(result.facts) == 1
+    assert len(result.unmapped) == 0
+    assert list(result.facts.columns) == FACT_COLUMNS
+    assert list(result.unmapped.columns) == FACT_COLUMNS + ["reason"]
+
+
+def test_split_rejects_fact_without_concept():
+    result = _split(pd.DataFrame([make_fact(concept_cd=None)]))
+
+    assert len(result.facts) == 0
+    assert result.unmapped["reason"].tolist() == ["no concept in mapping"]
+
+
+def test_split_rejects_numeric_fact_without_value():
+    result = _split(pd.DataFrame([make_fact(nval_num=None)]))
+
+    assert len(result.facts) == 0
+    assert result.unmapped["reason"].tolist() == ["no numeric value"]
+
+
+def test_split_rejects_fact_with_unexpected_unit():
+    result = _split(pd.DataFrame([make_fact(units_cd="/h")]))
+
+    assert len(result.facts) == 0
+    assert result.unmapped["reason"].tolist() == ["unit differs from expected_unit"]
+
+
+def test_split_accepts_fact_without_expected_unit():
+    result = _split(pd.DataFrame([make_fact(units_cd="mm[Hg]", expected_unit=None)]))
+
+    assert len(result.facts) == 1
+
+
+def test_split_accepts_fact_without_value_type():
+    procedure = make_fact(resource_type="Procedure", valtype_cd=None, nval_num=None, units_cd=None, expected_unit=None)
+
+    result = _split(pd.DataFrame([procedure]))
+
+    assert len(result.facts) == 1
+
+
+def test_split_names_missing_concept_before_other_reasons():
+    result = _split(pd.DataFrame([make_fact(concept_cd=None, nval_num=None, units_cd="/h")]))
+
+    assert result.unmapped["reason"].tolist() == ["no concept in mapping"]
+
+
+def test_split_separates_accepted_and_rejected_rows():
+    facts = pd.DataFrame([
+        make_fact(resource_id="o1"),
+        make_fact(resource_id="o2", concept_cd=None),
+        make_fact(resource_id="o3", nval_num=None),
+    ])
+
+    result = _split(facts)
+
+    assert result.facts["resource_id"].tolist() == ["o1"]
+    assert result.unmapped["resource_id"].tolist() == ["o2", "o3"]
+    assert result.unmapped["reason"].tolist() == ["no concept in mapping", "no numeric value"]
