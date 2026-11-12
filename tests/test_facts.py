@@ -7,7 +7,7 @@ from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.bundle_loader import load_bundle
 from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts, _first
 from fhir_prototype.frames import bundle_to_frames
-from fhir_prototype.mapping import load_mapping
+from fhir_prototype.mapping import load_csv_mapping
 from fhir_prototype.processing import process
 from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation, FIXTURES, make_procedure
 
@@ -31,7 +31,7 @@ def test_observation_facts_assigns_concept_from_mapping():
     observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
 
-    facts = observation_facts(frames.observations, load_mapping())
+    facts = observation_facts(frames.observations, load_csv_mapping())
 
     assert len(facts) == 1
     assert facts.iloc[0]["concept_cd"] == "LOINC:8867-4"
@@ -40,7 +40,7 @@ def test_observation_facts_assigns_concept_from_mapping():
 def test_observation_facts_keeps_unmapped_observation_with_empty_concept():
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, make_observation())))
 
-    facts = observation_facts(frames.observations, load_mapping())
+    facts = observation_facts(frames.observations, load_csv_mapping())
 
     assert len(facts) == 1
     assert pd.isna(facts.iloc[0]["concept_cd"])
@@ -50,7 +50,7 @@ def test_observation_facts_puts_numeric_value_into_nval_num():
     observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
 
-    facts = observation_facts(frames.observations, load_mapping())
+    facts = observation_facts(frames.observations, load_csv_mapping())
 
     row = facts.iloc[0]
     assert row["valtype_cd"] == "N"
@@ -69,7 +69,7 @@ def test_observation_facts_reads_rass_score_from_value_text():
     del observation["valueQuantity"]
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
 
-    facts = observation_facts(frames.observations, load_mapping())
+    facts = observation_facts(frames.observations, load_csv_mapping())
 
     assert facts.iloc[0]["nval_num"] == -4
 
@@ -78,7 +78,7 @@ def test_observation_facts_has_fact_columns():
     observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
 
-    facts = observation_facts(frames.observations, load_mapping())
+    facts = observation_facts(frames.observations, load_csv_mapping())
 
     assert list(facts.columns) == [
         "resource_type",
@@ -104,7 +104,7 @@ def test_split_unmapped_separates_rows_without_concept():
     unmapped = make_observation(id="o2")
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, mapped, unmapped)))
 
-    result = split_unmapped(observation_facts(frames.observations, load_mapping()))
+    result = split_unmapped(observation_facts(frames.observations, load_csv_mapping()))
 
     assert list(result.facts["resource_id"]) == ["o1"]
     assert list(result.unmapped["resource_id"]) == ["o2"]
@@ -113,7 +113,7 @@ def test_split_unmapped_separates_rows_without_concept():
 def test_split_unmapped_counts_in_max_bundle():
     frames = process(bundle_to_frames(load_bundle(FIXTURES / "bundle_max_1.json")))
 
-    result = split_unmapped(observation_facts(frames.observations, load_mapping()))
+    result = split_unmapped(observation_facts(frames.observations, load_csv_mapping()))
 
     assert len(result.facts) == 200
     assert len(result.unmapped) == 40
@@ -123,7 +123,7 @@ def test_procedure_facts_uses_code_as_concept_without_value():
     procedure = make_procedure(meta={"profile": [VENTILATION_PROFILE]})
     frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, procedure)))
 
-    facts = procedure_facts(frames.procedures, load_mapping())
+    facts = procedure_facts(frames.procedures, load_csv_mapping())
 
     assert list(facts.columns) == FACT_COLUMNS
     row = facts.iloc[0]
@@ -138,7 +138,7 @@ def test_procedure_facts_uses_code_as_concept_without_value():
 def test_build_facts_combines_observations_and_procedures():
     frames = process(bundle_to_frames(load_bundle(FIXTURES / "bundle_max_1.json")))
 
-    result = build_facts(frames, load_mapping())
+    result = build_facts(frames, load_csv_mapping())
 
     assert len(result.facts) == 201
     assert len(result.unmapped) == 40
