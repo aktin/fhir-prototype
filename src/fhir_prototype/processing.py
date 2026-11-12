@@ -5,7 +5,7 @@ import pandas as pd
 from fhir_prototype.frames import BundleFrames
 
 
-def parse_dates(df: pd.DataFrame, columns: list[str], *, utc=False) -> pd.DataFrame:
+def to_datetime(df: pd.DataFrame, columns: list[str], *, utc=True) -> pd.DataFrame:
     result = df.copy()
     for column in columns:
         result[column] = pd.to_datetime(result[column], utc=utc)
@@ -15,8 +15,8 @@ def parse_dates(df: pd.DataFrame, columns: list[str], *, utc=False) -> pd.DataFr
 def process(frames: BundleFrames) -> BundleFrames:
     return replace(
         frames,
-        patients=parse_dates(frames.patients, ["birth_date"]),
-        observations=parse_dates(frames.observations, ["start", "end"], utc=True),
-        encounters=parse_dates(frames.encounters, ["start", "end"], utc=True),
-        procedures=parse_dates(frames.procedures, ["start", "end"], utc=True),
+        patients=to_datetime(frames.patients, ["birth_date"], utc=False),
+        observations=to_datetime(frames.observations, ["start", "end"]),
+        encounters=to_datetime(frames.encounters, ["start", "end"]),
+        procedures=to_datetime(frames.procedures, ["start", "end"]),
     )
