@@ -5,7 +5,7 @@ from typing import Any
 import pandas as pd
 from fhirpathpy import evaluate
 
-from fhir_prototype.bundle_index import Resource
+from fhir_prototype.bundle_index import Resource, BundleIndex
 from fhir_prototype.frames import BundleFrames
 
 
@@ -35,6 +35,25 @@ def _first(resource: Resource, path: str | None) -> Any:
         return None
     # evaluate adds type information to its input, so it works on a copy
     return next(iter(evaluate(copy.deepcopy(resource), path)), None)
+
+def _row(resource: Resource, index: BundleIndex, rule: dict) -> dict:
+    """Translate one resource into one fact row using its mapping rule."""
+    return {
+        "resource_type": resource["resourceType"],
+        "resource_id": resource["id"],
+        "patient_id": index.resolve(resource["subject"]["reference"])["id"],
+        "encounter_id": index.resolve(resource["encounter"]["reference"])["id"],
+        "concept_cd": rule.get("concept_cd"),
+        "modifier_cd": "@",
+        "start_date": _first(resource, rule.get("start")),
+        "end_date": _first(resource, rule.get("end")),
+        "valtype_cd": rule.get("valtype_cd"),
+        "tval_char": None,
+        "nval_num": _first(resource, rule.get("value")),
+        "units_cd": _first(resource, rule.get("unit")),
+        "expected_unit": rule.get("expected_unit"),
+#        "alt_codes": rule.get("alt_codes") or [],
+    }
 
 def split_unmapped(facts: pd.DataFrame) -> MappingResult:
     unmapped = facts["concept_cd"].isna()

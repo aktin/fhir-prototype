@@ -5,7 +5,8 @@ import pytest
 
 from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.bundle_loader import load_bundle
-from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts, _first
+from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts, _first, \
+    _row
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.mapping import load_csv_mapping
 from fhir_prototype.processing import process
@@ -203,3 +204,88 @@ def test_fhirpath_expressions_evaluate_on_fixtures(fixture):
 
     for procedure in index.of_type("Procedure"):
         assert _first(procedure, "performedPeriod.start | performedDateTime") is not None
+
+
+RULE = {
+    "profile": "https://example.org/StructureDefinition/heartrate",
+    "device_category": None,
+    "concept_cd": "LOINC:8867-4",
+    "valtype_cd": "N",
+    "value": "valueQuantity.value",
+    "unit": "valueQuantity.code",
+    "start": "effectivePeriod.start | effectiveDateTime",
+    "end": "effectivePeriod.end",
+    "expected_unit": "/min",
+}
+
+
+def test_row_translates_observation_by_rule():
+    observation = make_observation()
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    row = _row(observation, index, RULE)
+
+    assert row == {
+        "resource_type": "Observation",
+        "resource_id": "o1",
+        "patient_id": "p1",
+        "encounter_id": "e1",
+        "concept_cd": "LOINC:8867-4",
+        "modifier_cd": "@",
+        "start_date": "2024-01-15T09:00:00+01:00",
+        "end_date": None,
+        "valtype_cd": "N",
+        "tval_char": None,
+        "nval_num": 80,
+        "units_cd": "/min",
+        "expected_unit": "/min",
+    }
+
+
+def test_row_reads_period_of_observation():
+    observation = make_observation(effectivePeriod={
+        "start": "2024-01-15T10:00:00+01:00",
+        "end": "2024-01-15T10:01:00+01:00",
+    })
+    del observation["effectiveDateTime"]
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    row = _row(observation, index, RULE)
+
+    assert row["start_date"] == "2024-01-15T10:00:00+01:00"
+    assert row["end_date"] == "2024-01-15T10:01:00+01:00"
+
+
+def test_row_translates_procedure_without_value():
+    procedure = make_procedure()
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, procedure))
+    rule = {
+        "concept_cd": "SNOMED:1149092001",
+        "start": "performedPeriod.start | performedDateTime",
+        "end": "performedPeriod.end",
+    }
+
+    row = _row(procedure, index, rule)
+
+    assert row["resource_type"] == "Procedure"
+    assert row["resource_id"] == "pr1"
+    assert row["concept_cd"] == "SNOMED:1149092001"
+    assert row["start_date"] == "2024-01-15T10:00:00+01:00"
+    assert row["end_date"] is None
+    assert row["valtype_cd"] is None
+    assert row["nval_num"] is None
+    assert row["units_cd"] is None
+
+
+def test_row_without_rule_keeps_identity_but_has_no_concept():
+    observation = make_observation()
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    row = _row(observation, index, {})
+
+    assert row["resource_id"] == "o1"
+    assert row["patient_id"] == "p1"
+    assert row["encounter_id"] == "e1"
+    assert row["concept_cd"] is None
+    assert row["nval_num"] is None
+    assert row["start_date"] is None
