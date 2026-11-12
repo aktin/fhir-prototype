@@ -16,7 +16,5 @@ def process(frames: BundleFrames) -> BundleFrames:
     return replace(
         frames,
         patients=to_datetime(frames.patients, ["birth_date"], utc=False),
-        observations=to_datetime(frames.observations, ["start", "end"]),
         encounters=to_datetime(frames.encounters, ["start", "end"]),
-        procedures=to_datetime(frames.procedures, ["start", "end"]),
     )

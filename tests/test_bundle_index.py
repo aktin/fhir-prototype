@@ -1,10 +1,10 @@
 from pathlib import Path
 
 import pytest
+from helpers import make_bundle
 
 from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
-from fhir_prototype.bundle_loader import load_bundle, InvalidBundleError
-from helpers import make_bundle
+from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BASE = "https://fhir.example.org"

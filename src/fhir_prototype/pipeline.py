@@ -20,7 +20,7 @@ def run(
     if not validator.is_valid(bundle):
         raise InvalidBundleError(f"Bundle {bundle_path} failed validation")
     index = BundleIndex(bundle)
-    frames = process(bundle_to_frames(bundle))
+    frames = process(bundle_to_frames(index))
     result = build_facts(index, load_mapping())
     importer.write(frames, result)
     return result

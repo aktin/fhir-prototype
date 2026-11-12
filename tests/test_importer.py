@@ -1,9 +1,10 @@
 import pandas as pd
+from helpers import ENCOUNTER, PATIENT, make_bundle
 
+from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.facts import MappingResult
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.importer import CsvImporter
-from helpers import ENCOUNTER, PATIENT, make_bundle
 
 
 def make_result():
@@ -14,7 +15,7 @@ def make_result():
 
 
 def test_csv_importer_writes_four_files(tmp_path):
-    frames = bundle_to_frames(make_bundle(PATIENT, ENCOUNTER))
+    frames = bundle_to_frames(BundleIndex(make_bundle(PATIENT, ENCOUNTER)))
 
     CsvImporter(tmp_path).write(frames, make_result())
 
@@ -26,7 +27,7 @@ def test_csv_importer_writes_four_files(tmp_path):
 
 def test_csv_importer_creates_missing_directory(tmp_path):
     target = tmp_path / "out" / "run1"
-    frames = bundle_to_frames(make_bundle(PATIENT, ENCOUNTER))
+    frames = bundle_to_frames(BundleIndex(make_bundle(PATIENT, ENCOUNTER)))
 
     CsvImporter(target).write(frames, make_result())
 
@@ -34,7 +35,7 @@ def test_csv_importer_creates_missing_directory(tmp_path):
 
 
 def test_csv_importer_does_not_write_index_column(tmp_path):
-    frames = bundle_to_frames(make_bundle(PATIENT, ENCOUNTER))
+    frames = bundle_to_frames(BundleIndex(make_bundle(PATIENT, ENCOUNTER)))
 
     CsvImporter(tmp_path).write(frames, make_result())
 

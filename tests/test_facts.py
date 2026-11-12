@@ -2,12 +2,28 @@ import copy
 
 import pandas as pd
 import pytest
+from helpers import (
+    BASE,
+    ENCOUNTER,
+    FIXTURES,
+    PATIENT,
+    make_bundle,
+    make_observation,
+    make_procedure,
+)
 
-from fhir_prototype.bundle_index import BundleIndex
+from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
 from fhir_prototype.bundle_loader import load_bundle
-from fhir_prototype.facts import FACT_COLUMNS, _first, _row, _split, build_facts
+from fhir_prototype.facts import (
+    FACT_COLUMNS,
+    _device_category,
+    _first,
+    _profile,
+    _row,
+    _split,
+    build_facts,
+)
 from fhir_prototype.mapping import load_mapping
-from helpers import BASE, ENCOUNTER, FIXTURES, PATIENT, make_bundle, make_observation, make_procedure
 
 START = "effectivePeriod.start | effectiveDateTime"
 
@@ -418,3 +434,38 @@ def test_build_facts_adds_no_alt_code_rows_without_alternative_codes():
     result = facts_of(make_observation())
 
     assert result.facts["modifier_cd"].tolist() == ["@"]
+
+
+def test_profile_returns_first_profile_of_resource():
+    assert _profile(make_observation()) == "https://example.org/StructureDefinition/heartrate"
+
+
+def test_profile_is_none_without_meta():
+    observation = make_observation()
+    del observation["meta"]
+
+    assert _profile(observation) is None
+
+
+def test_device_category_reads_category_of_referenced_device():
+    device = {"resourceType": "DeviceMetric", "id": "d1", "category": "measurement"}
+    observation = make_observation(device={"reference": f"{BASE}/DeviceMetric/d1"})
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, device, observation))
+
+    assert _device_category(observation, index) == "measurement"
+
+
+def test_device_category_is_none_without_device():
+    observation = make_observation()
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
+
+    assert _device_category(observation, index) is None
+
+
+@pytest.mark.parametrize("field", ["subject", "encounter", "device"])
+def test_build_facts_fails_on_unknown_reference(field):
+    missing = f"{BASE}/Unknown/does-not-exist"
+    observation = make_observation(**{field: {"reference": missing}})
+
+    with pytest.raises(UnresolvedReferenceError, match=missing):
+        facts_of(observation)

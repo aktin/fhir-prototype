@@ -1,11 +1,10 @@
 import pytest
+from helpers import FIXTURES
 
 from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.bundle_loader import load_bundle
-from fhir_prototype.facts import _first
-from fhir_prototype.frames import _device_category, _profile
+from fhir_prototype.facts import _device_category, _first, _profile
 from fhir_prototype.mapping import load_mapping
-from helpers import FIXTURES
 
 FIXTURE_NAMES = ["bundle_min.json", "bundle_max_1.json", "bundle_max_2.json"]
 RULE_KEYS = [

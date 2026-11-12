@@ -5,8 +5,7 @@ from typing import Any
 import pandas as pd
 from fhirpathpy import evaluate
 
-from fhir_prototype.bundle_index import Resource, BundleIndex
-from fhir_prototype.frames import _device_category, _profile
+from fhir_prototype.bundle_index import BundleIndex, Resource
 from fhir_prototype.processing import to_datetime
 
 
@@ -33,6 +32,17 @@ FACT_COLUMNS = [
 FACT_RESOURCE_TYPES = ["Observation", "Procedure"]
 EXCLUDED_STATUS = {"entered-in-error", "cancelled", "not-done"}
 ALT_CODE_MODIFIER = "altCode"
+
+
+def _device_category(resource: Resource, index: BundleIndex) -> str | None:
+    if "device" not in resource:
+        return None
+    device = index.resolve(resource["device"]["reference"])
+    return device.get("category")
+
+
+def _profile(resource: Resource) -> str | None:
+    return (resource.get("meta", {}).get("profile") or [None])[0]
 
 
 def _first(resource: Resource, path: str | None) -> Any:
