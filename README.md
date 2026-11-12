@@ -38,7 +38,7 @@ created if it does not exist and then contains two files:
 
 ## Mapping
 
-`src/fhir_prototype/icu_mapping.csv` assigns an i2b2 `concept_cd` to each FHIR
+`src/fhir_prototype/icu_mapping.json` assigns an i2b2 `concept_cd` to each FHIR
 profile (plus the device category for ventilation parameters). The code only
 applies this table, so a mapping decision is a change in the CSV and not in the
 code. The `status` column shows how settled a row is:

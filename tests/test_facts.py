@@ -5,12 +5,9 @@ import pytest
 
 from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.bundle_loader import load_bundle
-from fhir_prototype.facts import observation_facts, split_unmapped, FACT_COLUMNS, procedure_facts, build_facts, _first, \
-    _row, _split
-from fhir_prototype.frames import bundle_to_frames
-from fhir_prototype.mapping import load_csv_mapping
-from fhir_prototype.processing import process
-from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation, FIXTURES, make_procedure
+from fhir_prototype.facts import FACT_COLUMNS, _first, _row, _split, build_facts
+from fhir_prototype.mapping import load_mapping
+from helpers import BASE, ENCOUNTER, FIXTURES, PATIENT, make_bundle, make_observation, make_procedure
 
 HEART_RATE_PROFILE = (
     "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
@@ -26,125 +23,6 @@ VENTILATION_PROFILE = (
     "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/"
     "StructureDefinition/mii-pr-icu-beatmung"
 )
-
-
-def test_observation_facts_assigns_concept_from_mapping():
-    observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
-    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
-
-    facts = observation_facts(frames.observations, load_csv_mapping())
-
-    assert len(facts) == 1
-    assert facts.iloc[0]["concept_cd"] == "LOINC:8867-4"
-
-
-def test_observation_facts_keeps_unmapped_observation_with_empty_concept():
-    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, make_observation())))
-
-    facts = observation_facts(frames.observations, load_csv_mapping())
-
-    assert len(facts) == 1
-    assert pd.isna(facts.iloc[0]["concept_cd"])
-
-
-def test_observation_facts_puts_numeric_value_into_nval_num():
-    observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
-    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
-
-    facts = observation_facts(frames.observations, load_csv_mapping())
-
-    row = facts.iloc[0]
-    assert row["valtype_cd"] == "N"
-    assert row["nval_num"] == 80
-    assert row["units_cd"] == "/min"
-
-
-def test_observation_facts_reads_rass_score_from_value_text():
-    observation = make_observation(
-        meta={"profile": [RASS_PROFILE]},
-        valueCodeableConcept={
-            "coding": [{"system": "http://loinc.org", "code": "LA33966-5"}],
-            "text": "-4",
-        },
-    )
-    del observation["valueQuantity"]
-    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
-
-    facts = observation_facts(frames.observations, load_csv_mapping())
-
-    assert facts.iloc[0]["nval_num"] == -4
-
-
-def test_observation_facts_has_fact_columns():
-    observation = make_observation(meta={"profile": [HEART_RATE_PROFILE]})
-    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, observation)))
-
-    facts = observation_facts(frames.observations, load_csv_mapping())
-
-    assert list(facts.columns) == [
-        "resource_type",
-        "resource_id",
-        "patient_id",
-        "encounter_id",
-        "concept_cd",
-        "modifier_cd",
-        "start_date",
-        "end_date",
-        "valtype_cd",
-        "nval_num",
-        "units_cd",
-    ]
-    row = facts.iloc[0]
-    assert row["resource_type"] == "Observation"
-    assert row["modifier_cd"] == "@"
-    assert row["start_date"] == pd.Timestamp("2024-01-15T08:00:00Z")
-
-
-def test_split_unmapped_separates_rows_without_concept():
-    mapped = make_observation(id="o1", meta={"profile": [HEART_RATE_PROFILE]})
-    unmapped = make_observation(id="o2")
-    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, mapped, unmapped)))
-
-    result = split_unmapped(observation_facts(frames.observations, load_csv_mapping()))
-
-    assert list(result.facts["resource_id"]) == ["o1"]
-    assert list(result.unmapped["resource_id"]) == ["o2"]
-
-
-def test_split_unmapped_counts_in_max_bundle():
-    frames = process(bundle_to_frames(load_bundle(FIXTURES / "bundle_max_1.json")))
-
-    result = split_unmapped(observation_facts(frames.observations, load_csv_mapping()))
-
-    assert len(result.facts) == 200
-    assert len(result.unmapped) == 40
-
-
-def test_procedure_facts_uses_code_as_concept_without_value():
-    procedure = make_procedure(meta={"profile": [VENTILATION_PROFILE]})
-    frames = process(bundle_to_frames(make_bundle(PATIENT, ENCOUNTER, procedure)))
-
-    facts = procedure_facts(frames.procedures, load_csv_mapping())
-
-    assert list(facts.columns) == FACT_COLUMNS
-    row = facts.iloc[0]
-    assert row["resource_type"] == "Procedure"
-    assert row["resource_id"] == "pr1"
-    assert row["concept_cd"] == "SNOMED:1149092001"
-    assert row["modifier_cd"] == "@"
-    assert row["start_date"] == pd.Timestamp("2024-01-15T09:00:00Z")
-    assert pd.isna(row["nval_num"])
-
-
-def test_build_facts_combines_observations_and_procedures():
-    frames = process(bundle_to_frames(load_bundle(FIXTURES / "bundle_max_1.json")))
-
-    result = build_facts(frames, load_csv_mapping())
-
-    assert len(result.facts) == 201
-    assert len(result.unmapped) == 40
-    assert set(result.facts["resource_type"]) == {"Observation", "Procedure"}
-
 
 START = "effectivePeriod.start | effectiveDateTime"
 
@@ -373,3 +251,149 @@ def test_split_separates_accepted_and_rejected_rows():
     assert result.facts["resource_id"].tolist() == ["o1"]
     assert result.unmapped["resource_id"].tolist() == ["o2", "o3"]
     assert result.unmapped["reason"].tolist() == ["no concept in mapping", "no numeric value"]
+
+
+PROCEDURE_RULE = {
+    "profile": "https://example.org/StructureDefinition/ventilation",
+    "device_category": None,
+    "concept_cd": "SNOMED:1149092001",
+    "valtype_cd": None,
+    "start": "performedPeriod.start | performedDateTime",
+    "end": "performedPeriod.end",
+}
+
+
+def facts_of(*resources, rules=(RULE, PROCEDURE_RULE)):
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, *resources))
+    return build_facts(index, list(rules))
+
+
+def test_build_facts_translates_observations_and_procedures():
+    result = facts_of(make_observation(), make_procedure())
+
+    assert result.facts["resource_type"].tolist() == ["Observation", "Procedure"]
+    assert result.facts["concept_cd"].tolist() == ["LOINC:8867-4", "SNOMED:1149092001"]
+    assert len(result.unmapped) == 0
+
+
+def test_build_facts_returns_fact_columns_with_tval_char():
+    result = facts_of(make_observation())
+
+    assert list(result.facts.columns) == FACT_COLUMNS
+    assert FACT_COLUMNS.index("tval_char") == FACT_COLUMNS.index("valtype_cd") + 1
+
+
+def test_build_facts_converts_times_to_utc():
+    result = facts_of(make_observation())
+
+    assert result.facts.iloc[0]["start_date"] == pd.Timestamp("2024-01-15T08:00:00Z")
+    assert str(result.facts["start_date"].dt.tz) == "UTC"
+    assert pd.isna(result.facts.iloc[0]["end_date"])
+
+
+def test_build_facts_stores_decimal_value_as_number():
+    rule = {**RULE, "expected_unit": "Cel"}
+    observation = make_observation(valueQuantity={"value": 36.6, "unit": "°C", "code": "Cel"})
+
+    result = facts_of(observation, rules=[rule])
+
+    assert result.facts.iloc[0]["nval_num"] == 36.6
+    assert result.facts["nval_num"].dtype == "float64"
+
+
+def test_build_facts_reads_number_from_text():
+    rule = {**RULE, "value": "valueCodeableConcept.text", "unit": None, "expected_unit": None}
+    observation = make_observation(valueCodeableConcept={"text": "-4"})
+    del observation["valueQuantity"]
+
+    result = facts_of(observation, rules=[rule])
+
+    assert result.facts.iloc[0]["nval_num"] == -4
+
+
+def test_build_facts_rejects_text_that_is_not_a_number():
+    rule = {**RULE, "value": "valueCodeableConcept.text", "unit": None, "expected_unit": None}
+    observation = make_observation(valueCodeableConcept={"text": "unknown"})
+    del observation["valueQuantity"]
+
+    result = facts_of(observation, rules=[rule])
+
+    assert len(result.facts) == 0
+    assert result.unmapped["reason"].tolist() == ["no numeric value"]
+
+
+def test_build_facts_leaves_value_empty_without_numeric_value_type():
+    result = facts_of(make_procedure())
+
+    assert pd.isna(result.facts.iloc[0]["nval_num"])
+    assert pd.isna(result.facts.iloc[0]["valtype_cd"])
+
+
+def test_build_facts_moves_resource_without_rule_to_unmapped():
+    result = facts_of(make_observation(), rules=[])
+
+    assert len(result.facts) == 0
+    assert result.unmapped["resource_id"].tolist() == ["o1"]
+    assert result.unmapped["reason"].tolist() == ["no concept in mapping"]
+
+
+def test_build_facts_skips_resources_with_excluded_status():
+    result = facts_of(
+        make_observation(),
+        make_observation(id="o2", status="entered-in-error"),
+        make_observation(id="o3", status="cancelled"),
+    )
+
+    assert result.facts["resource_id"].tolist() == ["o1"]
+    assert len(result.unmapped) == 0
+
+
+def test_build_facts_picks_rule_by_device_category():
+    device = {"resourceType": "DeviceMetric", "id": "d1", "category": "setting"}
+    observation = make_observation(device={"reference": f"{BASE}/DeviceMetric/d1"})
+    rules = [
+        {**RULE, "device_category": "setting", "concept_cd": "TEST:SET"},
+        {**RULE, "device_category": "measurement", "concept_cd": "TEST:MEAS"},
+    ]
+
+    result = facts_of(device, observation, rules=rules)
+
+    assert result.facts["concept_cd"].tolist() == ["TEST:SET"]
+
+
+def test_build_facts_handles_bundle_without_fact_resources():
+    result = facts_of()
+
+    assert len(result.facts) == 0
+    assert len(result.unmapped) == 0
+    assert list(result.facts.columns) == FACT_COLUMNS
+
+
+@pytest.mark.parametrize("fixture, facts, unmapped", [
+    ("bundle_min.json", 51, 10),
+    ("bundle_max_1.json", 201, 40),
+    ("bundle_max_2.json", 201, 40),
+])
+def test_build_facts_counts_in_fixtures(fixture, facts, unmapped):
+    index = BundleIndex(load_bundle(FIXTURES / fixture))
+
+    result = build_facts(index, load_mapping())
+
+    assert len(result.facts) == facts
+    assert len(result.unmapped) == unmapped
+    assert set(result.unmapped["reason"]) == {"no concept in mapping"}
+    assert result.facts["concept_cd"].notna().all()
+    assert result.facts["start_date"].notna().all()
+
+
+def test_build_facts_handles_dst_change_in_max_bundle_2():
+    index = BundleIndex(load_bundle(FIXTURES / "bundle_max_2.json"))
+
+    result = build_facts(index, load_mapping())
+
+    def start_of(table, resource_id):
+        return table[table["resource_id"] == resource_id].iloc[0]["start_date"]
+
+    assert str(result.facts["start_date"].dt.tz) == "UTC"
+    assert start_of(result.facts, "icu-rass-a6170189a93b") == pd.Timestamp("2024-03-31T08:00:00Z")
+    assert start_of(result.unmapped, "icu-vent-map-measured-bd30493bd56f") == pd.Timestamp("2024-03-31T00:29:00Z")
