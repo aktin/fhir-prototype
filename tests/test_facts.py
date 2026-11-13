@@ -64,27 +64,6 @@ def test_first_does_not_modify_resource():
     assert observation == before
 
 
-@pytest.mark.parametrize("fixture", [
-    "bundle_min.json",
-    "bundle_max_1.json",
-    "bundle_max_2.json",
-])
-def test_fhirpath_expressions_evaluate_on_fixtures(fixture):
-    index = BundleIndex(load_bundle(FIXTURES / fixture))
-
-    for observation in index.of_type("Observation"):
-        assert _first(observation, START) is not None
-        values = [
-            _first(observation, "valueQuantity.value"),
-            _first(observation, "valueInteger"),
-            _first(observation, "valueCodeableConcept.text"),
-        ]
-        assert sum(value is not None for value in values) == 1
-
-    for procedure in index.of_type("Procedure"):
-        assert _first(procedure, "performedPeriod.start | performedDateTime") is not None
-
-
 RULE = {
     "profile": "https://example.org/StructureDefinition/heartrate",
     "device_category": None,

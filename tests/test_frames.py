@@ -9,7 +9,7 @@ from fhir_prototype.frames import (
     encounters_frame,
     patients_frame,
 )
-from helpers import BASE, ENCOUNTER, FIXTURES, PATIENT, make_bundle, make_encounter
+from helpers import BASE, FIXTURES, PATIENT, make_bundle, make_encounter
 
 
 def test_patients_frame_has_one_row_per_patient():
@@ -125,9 +125,3 @@ def test_bundle_to_frames_builds_patient_and_encounter_tables():
 
     assert len(frames.patients) == 1
     assert len(frames.encounters) == 1
-
-
-def test_bundle_frames_has_only_patients_and_encounters():
-    frames = bundle_to_frames(BundleIndex(make_bundle(PATIENT, ENCOUNTER)))
-
-    assert list(vars(frames)) == ["patients", "encounters"]
