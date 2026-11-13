@@ -1,10 +1,10 @@
 import pandas as pd
-from helpers import ENCOUNTER, PATIENT, make_bundle
 
 from fhir_prototype.bundle_index import BundleIndex
 from fhir_prototype.facts import MappingResult
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.importer import CsvImporter
+from helpers import ENCOUNTER, PATIENT, make_bundle
 
 
 def make_result():

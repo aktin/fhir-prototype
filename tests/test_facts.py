@@ -2,15 +2,6 @@ import copy
 
 import pandas as pd
 import pytest
-from helpers import (
-    BASE,
-    ENCOUNTER,
-    FIXTURES,
-    PATIENT,
-    make_bundle,
-    make_observation,
-    make_procedure,
-)
 
 from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
 from fhir_prototype.bundle_loader import load_bundle
@@ -24,6 +15,15 @@ from fhir_prototype.facts import (
     build_facts,
 )
 from fhir_prototype.mapping import load_mapping
+from helpers import (
+    BASE,
+    ENCOUNTER,
+    FIXTURES,
+    PATIENT,
+    make_bundle,
+    make_observation,
+    make_procedure,
+)
 
 START = "effectivePeriod.start | effectiveDateTime"
 

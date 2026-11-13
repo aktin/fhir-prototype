@@ -1,9 +1,9 @@
 import pandas as pd
-from helpers import PATIENT, make_bundle, make_encounter
 
 from fhir_prototype.bundle_index import BundleIndex
-from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.dates import parse_dates, to_datetime
+from fhir_prototype.frames import bundle_to_frames
+from helpers import PATIENT, make_bundle, make_encounter
 
 
 def frames_of(*resources):

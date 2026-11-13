@@ -1,11 +1,11 @@
 import pandas as pd
 import pytest
-from helpers import FIXTURES
 
 from fhir_prototype.bundle_loader import InvalidBundleError
 from fhir_prototype.importer import CsvImporter, Importer
 from fhir_prototype.pipeline import run
 from fhir_prototype.validation import BundleValidator
+from helpers import FIXTURES
 
 
 class RecordingImporter(Importer):
