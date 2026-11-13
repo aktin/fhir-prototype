@@ -1,11 +1,9 @@
 import json
-from pathlib import Path
 
 import pytest
 
 from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle
-
-FIXTURES = Path(__file__).parent / "fixtures"
+from helpers import FIXTURES
 
 
 def test_loads_bundle_from_file():
