@@ -1,13 +1,8 @@
-from pathlib import Path
-
 import pytest
 
 from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
 from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle
-from helpers import make_bundle
-
-FIXTURES = Path(__file__).parent / "fixtures"
-BASE = "https://fhir.example.org"
+from helpers import BASE, FIXTURES, make_bundle
 
 
 def test_of_type_returns_only_resources_of_that_type():
