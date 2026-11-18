@@ -237,6 +237,55 @@ def test_split_separates_accepted_and_rejected_rows():
     assert result.unmapped["reason"].tolist() == ["no concept in mapping", "no numeric value"]
 
 
+def make_modifier(**overrides):
+    modifier = make_fact(modifier_cd="fhirVersion", valtype_cd="T", tval_char="4.0.1", nval_num=None, units_cd=None,
+                         expected_unit=None)
+    modifier.update(overrides)
+    return modifier
+
+
+def test_split_keeps_modifiers_of_accepted_fact():
+    result = _split(pd.DataFrame([make_fact(), make_modifier()]))
+
+    assert result.facts["modifier_cd"].tolist() == ["@", "fhirVersion"]
+    assert len(result.unmapped) == 0
+
+
+def test_split_drops_modifiers_of_rejected_fact():
+    result = _split(pd.DataFrame([make_fact(nval_num=None), make_modifier()]))
+
+    assert len(result.facts) == 0
+    assert result.unmapped["modifier_cd"].tolist() == ["@"]
+    assert result.unmapped["reason"].tolist() == ["no numeric value"]
+
+
+def test_split_rejects_only_the_resource_with_the_problem():
+    facts = pd.DataFrame([
+        make_fact(resource_id="o1"),
+        make_modifier(resource_id="o1"),
+        make_fact(resource_id="o2", nval_num=None),
+        make_modifier(resource_id="o2"),
+    ])
+
+    result = _split(facts)
+
+    assert result.facts["resource_id"].tolist() == ["o1", "o1"]
+    assert result.unmapped["resource_id"].tolist() == ["o2"]
+
+
+def test_split_keeps_resources_apart_by_type():
+    facts = pd.DataFrame([
+        make_fact(resource_type="Observation", resource_id="x1", nval_num=None),
+        make_fact(resource_type="Procedure", resource_id="x1", valtype_cd=None, nval_num=None, units_cd=None,
+                  expected_unit=None),
+    ])
+
+    result = _split(facts)
+
+    assert result.facts["resource_type"].tolist() == ["Procedure"]
+    assert result.unmapped["resource_type"].tolist() == ["Observation"]
+
+
 HEART_RATE_PROFILE = "https://example.org/StructureDefinition/heartrate"
 VENTILATION_PROFILE = "https://example.org/StructureDefinition/ventilation"
 

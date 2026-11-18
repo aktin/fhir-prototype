@@ -73,17 +73,20 @@ def _row(resource: Resource, index: BundleIndex, rule: dict) -> dict:
 
 
 def _split(facts: pd.DataFrame) -> MappingResult:
-    """Separate the rows that cannot be imported and name the reason for each."""
+    """Separate the resources that cannot be imported and name the reason for each."""
+    main = facts["modifier_cd"] == "@"
     reason = pd.Series(None, index=facts.index, dtype=object)
     differs = facts["units_cd"].notna() & facts["expected_unit"].notna() & (facts["units_cd"] != facts["expected_unit"])
     reason[differs] = "unit differs from expected_unit"
     reason[(facts["valtype_cd"] == "N") & facts["nval_num"].isna()] = "no numeric value"
     reason[facts["concept_cd"].isna()] = "no concept in mapping"
-    rejected = reason.notna()
-    accepted = facts[~rejected]
+    reason[~main] = None
+    key = ["resource_type", "resource_id"]
+    rejected_keys = pd.MultiIndex.from_frame(facts.loc[reason.notna(), key])
+    rejected = facts.set_index(key).index.isin(rejected_keys)
     return MappingResult(
-        facts=accepted[FACT_COLUMNS],
-        unmapped=facts.loc[rejected, FACT_COLUMNS].assign(reason=reason[rejected]),
+        facts=facts.loc[~rejected, FACT_COLUMNS].reset_index(drop=True),
+        unmapped=facts.loc[rejected & main, FACT_COLUMNS].assign(reason=reason[rejected & main]).reset_index(drop=True),
     )
 
 
