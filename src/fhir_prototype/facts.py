@@ -31,7 +31,6 @@ FACT_COLUMNS = [
 ]
 FACT_RESOURCE_TYPES = ["Observation", "Procedure"]
 EXCLUDED_STATUS = {"entered-in-error", "cancelled", "not-done"}
-ALT_CODE_MODIFIER = "altCode"
 
 
 def _device_category(resource: Resource, index: BundleIndex) -> str | None:
@@ -73,18 +72,6 @@ def _row(resource: Resource, index: BundleIndex, rule: dict) -> dict:
     }
 
 
-def _alt_code_facts(facts: pd.DataFrame) -> pd.DataFrame:
-    """Return one modifier row per alternative code of each fact, without the value of the fact."""
-    rows = facts.explode("alt_codes").dropna(subset="alt_codes")
-    return rows.assign(
-        modifier_cd=ALT_CODE_MODIFIER,
-        valtype_cd="T",
-        tval_char=rows["alt_codes"],
-        nval_num=float("nan"),
-        units_cd=None,
-    )
-
-
 def _split(facts: pd.DataFrame) -> MappingResult:
     """Separate the rows that cannot be imported and name the reason for each."""
     reason = pd.Series(None, index=facts.index, dtype=object)
@@ -95,21 +82,21 @@ def _split(facts: pd.DataFrame) -> MappingResult:
     rejected = reason.notna()
     accepted = facts[~rejected]
     return MappingResult(
-        facts=pd.concat([accepted, _alt_code_facts(accepted)], ignore_index=True)[FACT_COLUMNS],
+        facts=accepted[FACT_COLUMNS],
         unmapped=facts.loc[rejected, FACT_COLUMNS].assign(reason=reason[rejected]),
     )
 
 
-def build_facts(index: BundleIndex, mapping: list[dict]) -> MappingResult:
+def build_facts(index: BundleIndex, mapping: dict[str, dict]) -> MappingResult:
     """Translate the resources of a bundle into i2b2 facts as defined by the mapping."""
-    rules = {(rule["profile"], rule.get("device_category")): rule for rule in mapping}
     rows = [
-        _row(resource, index, rules.get((_profile(resource), _device_category(resource, index)), {}))
+        row
         for resource_type in FACT_RESOURCE_TYPES
         for resource in index.of_type(resource_type)
         if resource.get("status") not in EXCLUDED_STATUS
+        for row in _fact_rows(resource, index, mapping.get(_profile(resource), {}))
     ]
-    facts = pd.DataFrame(rows, columns=FACT_COLUMNS + ["expected_unit", "alt_codes"])
+    facts = pd.DataFrame(rows, columns=FACT_COLUMNS + ["expected_unit"])
     numeric = facts["valtype_cd"] == "N"
     facts["nval_num"] = pd.to_numeric(facts["nval_num"], errors="coerce").where(numeric)
     return _split(to_datetime(facts, ["start_date", "end_date"]))
@@ -134,13 +121,13 @@ def _values(resource: Resource, spec: dict) -> dict:
 
 def _fact_rows(resource: Resource, index: BundleIndex, rule: dict) -> list[dict]:
     """Translate one resource into its main fact row and one row per modifier."""
-    concept = rule["concept"]
+    concept = rule.get("concept", {})
     shared = {
         "resource_type": resource["resourceType"],
         "resource_id": resource["id"],
         "patient_id": index.resolve(resource["subject"]["reference"])["id"],
         "encounter_id": index.resolve(resource["encounter"]["reference"])["id"],
-        "concept_cd": concept["concept_cd"],
+        "concept_cd": concept.get("concept_cd"),
         "start_date": _resolve(resource, concept.get("start_date")),
         "end_date": _resolve(resource, concept.get("end_date")),
     }
