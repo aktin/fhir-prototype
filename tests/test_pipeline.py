@@ -4,7 +4,7 @@ import pytest
 from fhir_prototype.bundle_loader import InvalidBundleError
 from fhir_prototype.importer import CsvImporter, Importer
 from fhir_prototype.pipeline import run
-from fhir_prototype.validation import BundleValidator
+from fhir_prototype.validation import BundleValidator, NoValidation
 from helpers import FIXTURES
 
 
@@ -50,3 +50,20 @@ def test_run_aborts_when_validator_rejects_bundle():
         run(FIXTURES / "bundle_min.json", importer, validator=RejectAll())
 
     assert importer.calls == []
+
+
+@pytest.mark.parametrize("kwargs", [{}, {"validator": None}])
+def test_run_defaults_to_no_validation(monkeypatch, kwargs):
+    bundles = []
+
+    def record_validation(self, bundle):
+        bundles.append(bundle)
+        return True
+
+    monkeypatch.setattr(NoValidation, "is_valid", record_validation)
+    importer = RecordingImporter()
+    run(FIXTURES / "bundle_min.json", importer, **kwargs)
+
+    assert len(bundles) == 1
+    assert bundles[0]["resourceType"] == "Bundle"
+    assert len(importer.calls) == 1
