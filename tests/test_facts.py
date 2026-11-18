@@ -8,6 +8,7 @@ from fhir_prototype.bundle_loader import load_bundle
 from fhir_prototype.facts import (
     FACT_COLUMNS,
     _device_category,
+    _fact_rows,
     _first,
     _profile,
     _row,
@@ -484,3 +485,111 @@ def test_resolve_builds_prefixed_code():
     expression = "@'LOINC:' + valueCodeableConcept.coding.where(system = 'http://loinc.org').code"
 
     assert _resolve(observation, expression) == "LOINC:LA33966-5"
+
+
+RASS_PROFILE = "https://www.medizininformatik-initiative.de/fhir/ext/modul-icu/StructureDefinition/mii-pr-icu-score-rass"
+
+RASS_RULE = {
+    "concept": {
+        "concept_cd": "SNOMED:1345050000",
+        "valtype_cd": "N",
+        "nval_num": "@valueCodeableConcept.text",
+        "start_date": "@effectivePeriod.start | effectiveDateTime",
+        "end_date": "@effectivePeriod.end",
+    },
+    "modifiers": {
+        "fhirVersion": {"valtype_cd": "T", "tval_char": "4.0.1"},
+        "answerCode": {
+            "valtype_cd": "T",
+            "tval_char": "@'LOINC:' + valueCodeableConcept.coding.where(system = 'http://loinc.org').code",
+        },
+        "codeVersion": {
+            "valtype_cd": "T",
+            "tval_char": "@code.coding.where(system = 'http://snomed.info/sct').version",
+        },
+    },
+}
+
+SNOMED_VERSION = "http://snomed.info/sct/900000000000207008/version/20241101"
+
+
+def make_rass(**overrides):
+    rass = make_observation(
+        id="rass1",
+        meta={"profile": [RASS_PROFILE]},
+        code={"coding": [{"system": "http://snomed.info/sct", "version": SNOMED_VERSION, "code": "1345050000"}]},
+        valueCodeableConcept={
+            "coding": [{"system": "http://loinc.org", "code": "LA33966-5", "display": "Deep sedation"}],
+            "text": "-4",
+        },
+    )
+    del rass["valueQuantity"]
+    rass.update(overrides)
+    return rass
+
+
+def rows_of(resource, rule=RASS_RULE):
+    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, resource))
+    return _fact_rows(resource, index, rule)
+
+
+def test_fact_rows_builds_main_row_from_concept():
+    main = rows_of(make_rass())[0]
+
+    assert main == {
+        "resource_type": "Observation",
+        "resource_id": "rass1",
+        "patient_id": "p1",
+        "encounter_id": "e1",
+        "concept_cd": "SNOMED:1345050000",
+        "start_date": "2024-01-15T09:00:00+01:00",
+        "end_date": None,
+        "modifier_cd": "@",
+        "valtype_cd": "N",
+        "tval_char": None,
+        "nval_num": "-4",
+        "units_cd": None,
+        "expected_unit": None,
+    }
+
+
+def test_fact_rows_adds_one_row_per_modifier_named_by_its_key():
+    rows = rows_of(make_rass())
+
+    assert [row["modifier_cd"] for row in rows] == ["@", "fhirVersion", "answerCode", "codeVersion"]
+
+
+def test_fact_rows_modifiers_take_constant_and_expression_values():
+    rows = rows_of(make_rass())
+
+    assert [row["tval_char"] for row in rows[1:]] == ["4.0.1", "LOINC:LA33966-5", SNOMED_VERSION]
+    assert {row["valtype_cd"] for row in rows[1:]} == {"T"}
+
+
+def test_fact_rows_modifiers_share_identity_concept_and_times_with_main_row():
+    rows = rows_of(make_rass())
+    shared = ["resource_id", "patient_id", "encounter_id", "concept_cd", "start_date", "end_date"]
+
+    for modifier in rows[1:]:
+        assert {key: modifier[key] for key in shared} == {key: rows[0][key] for key in shared}
+
+
+def test_fact_rows_modifiers_have_no_value_of_main_fact():
+    for modifier in rows_of(make_rass())[1:]:
+        assert modifier["nval_num"] is None
+        assert modifier["units_cd"] is None
+        assert modifier["expected_unit"] is None
+
+
+def test_fact_rows_skips_modifier_whose_expression_finds_nothing():
+    rass = make_rass(valueCodeableConcept={"text": "-4"})
+
+    rows = rows_of(rass)
+
+    assert [row["modifier_cd"] for row in rows] == ["@", "fhirVersion", "codeVersion"]
+
+
+def test_fact_rows_without_modifiers_returns_only_main_row():
+    rows = rows_of(make_rass(), {"concept": RASS_RULE["concept"]})
+
+    assert len(rows) == 1

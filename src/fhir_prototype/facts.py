@@ -120,3 +120,38 @@ def _resolve(resource: Resource, value: Any) -> Any:
     if isinstance(value, str) and value.startswith("@"):
         return _first(resource, value[1:])
     return value
+
+
+def _values(resource: Resource, spec: dict) -> dict:
+    """Resolve the value columns of one fact row from its part of the rule."""
+    return {
+        "valtype_cd": _resolve(resource, spec.get("valtype_cd")),
+        "tval_char": _resolve(resource, spec.get("tval_char")),
+        "nval_num": _resolve(resource, spec.get("nval_num")),
+        "units_cd": _resolve(resource, spec.get("units_cd")),
+    }
+
+
+def _fact_rows(resource: Resource, index: BundleIndex, rule: dict) -> list[dict]:
+    """Translate one resource into its main fact row and one row per modifier."""
+    concept = rule["concept"]
+    shared = {
+        "resource_type": resource["resourceType"],
+        "resource_id": resource["id"],
+        "patient_id": index.resolve(resource["subject"]["reference"])["id"],
+        "encounter_id": index.resolve(resource["encounter"]["reference"])["id"],
+        "concept_cd": concept["concept_cd"],
+        "start_date": _resolve(resource, concept.get("start_date")),
+        "end_date": _resolve(resource, concept.get("end_date")),
+    }
+    main = {
+        **shared,
+        "modifier_cd": "@",
+        **_values(resource, concept),
+        "expected_unit": concept.get("expected_unit"),
+    }
+    modifiers = [
+        {**shared, "modifier_cd": name, **_values(resource, spec), "expected_unit": None}
+        for name, spec in rule.get("modifiers", {}).items()
+    ]
+    return [main] + [row for row in modifiers if row["tval_char"] is not None or row["nval_num"] is not None]
