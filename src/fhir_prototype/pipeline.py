@@ -13,7 +13,7 @@ from fhir_prototype.validation import NoValidation, BundleValidator
 def run(
         bundle_path: str | Path,
         importer: Importer,
-        validator: BundleValidator | None,
+        validator: BundleValidator | None = None,
 ) -> MappingResult:
     """Run the whole pipeline for one bundle file and hand the result to the importer."""
     validator = validator or NoValidation()
