@@ -12,6 +12,7 @@ from fhir_prototype.facts import (
     _profile,
     _row,
     _split,
+    _resolve,
     build_facts,
 )
 from fhir_prototype.mapping import load_mapping
@@ -448,3 +449,38 @@ def test_build_facts_fails_on_unknown_reference(field):
 
     with pytest.raises(UnresolvedReferenceError, match=missing):
         facts_of(observation)
+
+
+def test_resolve_returns_constant_as_is():
+    assert _resolve(make_observation(), "4.0.1") == "4.0.1"
+    assert _resolve(make_observation(), "SNOMED:1345050000") == "SNOMED:1345050000"
+
+
+def test_resolve_returns_non_string_constant_as_is():
+    assert _resolve(make_observation(), 7) == 7
+
+
+def test_resolve_returns_none_for_none():
+    assert _resolve(make_observation(), None) is None
+
+
+def test_resolve_evaluates_expression_after_at_sign():
+    observation = make_observation()
+
+    assert _resolve(observation, "@valueQuantity.value") == 80
+    assert _resolve(observation, "@valueQuantity.code") == "/min"
+
+
+def test_resolve_returns_none_when_expression_finds_nothing():
+    assert _resolve(make_observation(), "@valueInteger") is None
+
+
+def test_resolve_builds_prefixed_code():
+    observation = make_observation(valueCodeableConcept={
+        "coding": [{"system": "http://loinc.org", "code": "LA33966-5"}],
+        "text": "-4",
+    })
+
+    expression = "@'LOINC:' + valueCodeableConcept.coding.where(system = 'http://loinc.org').code"
+
+    assert _resolve(observation, expression) == "LOINC:LA33966-5"

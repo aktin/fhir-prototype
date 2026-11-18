@@ -113,3 +113,10 @@ def build_facts(index: BundleIndex, mapping: list[dict]) -> MappingResult:
     numeric = facts["valtype_cd"] == "N"
     facts["nval_num"] = pd.to_numeric(facts["nval_num"], errors="coerce").where(numeric)
     return _split(to_datetime(facts, ["start_date", "end_date"]))
+
+
+def _resolve(resource: Resource, value: Any) -> Any:
+    """Return a constant as is, or evaluate it as FHIRPath when it starts with @."""
+    if isinstance(value, str) and value.startswith("@"):
+        return _first(resource, value[1:])
+    return value
