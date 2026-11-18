@@ -52,26 +52,6 @@ def _first(resource: Resource, path: str | None) -> Any:
     return next(iter(evaluate(copy.deepcopy(resource), path)), None)
 
 
-def _row(resource: Resource, index: BundleIndex, rule: dict) -> dict:
-    """Translate one resource into one fact row using its mapping rule."""
-    return {
-        "resource_type": resource["resourceType"],
-        "resource_id": resource["id"],
-        "patient_id": index.resolve(resource["subject"]["reference"])["id"],
-        "encounter_id": index.resolve(resource["encounter"]["reference"])["id"],
-        "concept_cd": rule.get("concept_cd"),
-        "modifier_cd": "@",
-        "start_date": _first(resource, rule.get("start")),
-        "end_date": _first(resource, rule.get("end")),
-        "valtype_cd": rule.get("valtype_cd"),
-        "tval_char": None,
-        "nval_num": _first(resource, rule.get("value")),
-        "units_cd": _first(resource, rule.get("unit")),
-        "expected_unit": rule.get("expected_unit"),
-        "alt_codes": rule.get("alt_codes") or [],
-    }
-
-
 def _split(facts: pd.DataFrame) -> MappingResult:
     """Separate the resources that cannot be imported and name the reason for each."""
     main = facts["modifier_cd"] == "@"

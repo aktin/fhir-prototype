@@ -12,7 +12,6 @@ from fhir_prototype.facts import (
     _first,
     _profile,
     _resolve,
-    _row,
     _split,
     build_facts,
 )
@@ -64,92 +63,6 @@ def test_first_does_not_modify_resource():
     _first(observation, "valueQuantity.value")
 
     assert observation == before
-
-
-RULE = {
-    "profile": "https://example.org/StructureDefinition/heartrate",
-    "device_category": None,
-    "concept_cd": "LOINC:8867-4",
-    "valtype_cd": "N",
-    "value": "valueQuantity.value",
-    "unit": "valueQuantity.code",
-    "start": "effectivePeriod.start | effectiveDateTime",
-    "end": "effectivePeriod.end",
-    "expected_unit": "/min",
-}
-
-
-def test_row_translates_observation_by_rule():
-    observation = make_observation()
-    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
-
-    row = _row(observation, index, RULE)
-
-    assert row == {
-        "resource_type": "Observation",
-        "resource_id": "o1",
-        "patient_id": "p1",
-        "encounter_id": "e1",
-        "concept_cd": "LOINC:8867-4",
-        "modifier_cd": "@",
-        "start_date": "2024-01-15T09:00:00+01:00",
-        "end_date": None,
-        "valtype_cd": "N",
-        "tval_char": None,
-        "alt_codes": [],
-        "nval_num": 80,
-        "units_cd": "/min",
-        "expected_unit": "/min",
-    }
-
-
-def test_row_reads_period_of_observation():
-    observation = make_observation(effectivePeriod={
-        "start": "2024-01-15T10:00:00+01:00",
-        "end": "2024-01-15T10:01:00+01:00",
-    })
-    del observation["effectiveDateTime"]
-    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
-
-    row = _row(observation, index, RULE)
-
-    assert row["start_date"] == "2024-01-15T10:00:00+01:00"
-    assert row["end_date"] == "2024-01-15T10:01:00+01:00"
-
-
-def test_row_translates_procedure_without_value():
-    procedure = make_procedure()
-    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, procedure))
-    rule = {
-        "concept_cd": "SNOMED:1149092001",
-        "start": "performedPeriod.start | performedDateTime",
-        "end": "performedPeriod.end",
-    }
-
-    row = _row(procedure, index, rule)
-
-    assert row["resource_type"] == "Procedure"
-    assert row["resource_id"] == "pr1"
-    assert row["concept_cd"] == "SNOMED:1149092001"
-    assert row["start_date"] == "2024-01-15T10:00:00+01:00"
-    assert row["end_date"] is None
-    assert row["valtype_cd"] is None
-    assert row["nval_num"] is None
-    assert row["units_cd"] is None
-
-
-def test_row_without_rule_keeps_identity_but_has_no_concept():
-    observation = make_observation()
-    index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
-
-    row = _row(observation, index, {})
-
-    assert row["resource_id"] == "o1"
-    assert row["patient_id"] == "p1"
-    assert row["encounter_id"] == "e1"
-    assert row["concept_cd"] is None
-    assert row["nval_num"] is None
-    assert row["start_date"] is None
 
 
 def make_fact(**overrides):
@@ -435,9 +348,6 @@ def test_build_facts_handles_dst_change_in_max_bundle_2():
     assert str(result.facts["start_date"].dt.tz) == "UTC"
     assert start_of(result.facts, "icu-rass-e1a509206c6a") == pd.Timestamp("2024-03-31T00:00:00Z")
     assert start_of(result.facts, "icu-rass-a6170189a93b") == pd.Timestamp("2024-03-31T08:00:00Z")
-
-
-ALT_RULE = {**RULE, "alt_codes": ["LOINC:8310-5", "SNOMED:386725007"]}
 
 
 def test_profile_returns_first_profile_of_resource():
