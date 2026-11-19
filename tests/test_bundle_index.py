@@ -58,8 +58,7 @@ def test_all_observation_references_resolve_in_max_bundle():
 
 
 def test_rejects_entry_without_full_url():
-    bundle = make_bundle({"resourceType": "Patient", "id": "p1"},
-                         {"resourceType": "Observation", "id": "o1"})
+    bundle = make_bundle({"resourceType": "Patient", "id": "p1"}, {"resourceType": "Observation", "id": "o1"})
     del bundle["entry"][1]["fullUrl"]
 
     with pytest.raises(InvalidBundleError, match="Entry 1"):
@@ -67,8 +66,7 @@ def test_rejects_entry_without_full_url():
 
 
 def test_rejects_entry_without_resource():
-    bundle = make_bundle({"resourceType": "Patient", "id": "p1"},
-                         {"resourceType": "Observation", "id": "o1"})
+    bundle = make_bundle({"resourceType": "Patient", "id": "p1"}, {"resourceType": "Observation", "id": "o1"})
     del bundle["entry"][1]["resource"]
 
     with pytest.raises(InvalidBundleError, match="Entry 1"):
