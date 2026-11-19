@@ -28,20 +28,21 @@ Run steps 1 to 3 for one bundle and write the result as CSV:
 uv run python -c "from fhir_prototype.importer import CsvImporter; from fhir_prototype.pipeline import run; run('tests/fixtures/bundle_max_1.json', CsvImporter('output'))"
 ```
 
-The first argument is the bundle file, the second is the output folder. It is
-created if it does not exist and then contains two files:
+The first argument is the bundle file, the second is the output folder. It is created if it does not exist and then contains four files:
 
 | File | Content |
 |---|---|
+| `patients.csv` | one row per patient in the bundle |
+| `encounters.csv` | one row per encounter in the bundle |
 | `facts.csv` | rows that have an i2b2 concept and can be imported |
 | `unmapped.csv` | rows without a concept in the mapping table, they are not imported |
-
 ## Mapping
 
 `src/fhir_prototype/icu_mapping.json` assigns an i2b2 `concept_cd` to each FHIR
-profile (plus the device category for ventilation parameters). The code only
-applies this table, so a mapping decision is a change in the CSV and not in the
-code. The `status` column shows how settled a row is:
+profile (plus the device category for ventilation parameters). The file is a
+JSON list of objects. The code only applies this file, so a mapping decision is
+a change in the JSON file and not in the code. The `status` field shows how
+settled an entry is:
 
 | Status | Meaning |
 |---|---|
@@ -49,7 +50,7 @@ code. The `status` column shows how settled a row is:
 | `vorläufig` | provisional concept, to be confirmed |
 | `offen` | open question, see `open_question` |
 
-Rows with an empty `concept_cd` end up in `unmapped.csv`.
+Entries with an empty `concept_cd` end up in `unmapped.csv`.
 
 ## Test data
 
