@@ -1,9 +1,10 @@
 import json
 import re
+import zipfile
 
 import pytest
 
-from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle, parse_bundle
+from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle, load_zip, parse_bundle
 from helpers import FIXTURES, PATIENT, make_bundle
 
 
@@ -54,3 +55,20 @@ def test_load_bundle_names_file_in_error(tmp_path):
 
     with pytest.raises(InvalidBundleError, match=re.escape(str(path))):
         load_bundle(path)
+
+
+def _write_zip(path, entries):
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content)
+    return path
+
+
+def test_load_zip_returns_bundle_of_single_json(tmp_path):
+    text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
+    path = _write_zip(tmp_path / "delivery.zip", {"bundle_min.json": text})
+
+    bundles = load_zip(path)
+
+    assert len(bundles) == 1
+    assert bundles[0] == load_bundle(FIXTURES / "bundle_min.json")
