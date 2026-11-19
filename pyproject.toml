@@ -26,4 +26,5 @@ dev = [
 src = ["src", "tests"]
 
 [tool.ruff.lint]
+ignore = ["B008"]
 extend-select = ["I"]
