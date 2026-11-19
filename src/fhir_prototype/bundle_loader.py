@@ -1,4 +1,5 @@
 import json
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -24,3 +25,8 @@ def parse_bundle(text: str, source: str) -> dict[str, Any]:
         raise InvalidBundleError(f"{source}: expected resourceType 'Bundle', got {found!r}")
 
     return data
+
+
+def load_zip(path: str | Path) -> list[dict[str, Any]]:
+    with zipfile.ZipFile(path) as archive:
+        return [parse_bundle(archive.read(name).decode("utf-8"), f"{path}:{name}") for name in archive.namelist()]
