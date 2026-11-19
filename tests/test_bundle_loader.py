@@ -117,3 +117,34 @@ def test_load_zip_ignores_entries_that_are_not_json(tmp_path):
 
     assert len(bundles) == 2
     assert bundles[0] == load_bundle(FIXTURES / "bundle_min.json")
+
+
+def test_load_zip_rejects_file_that_is_not_a_zip(tmp_path):
+    path = tmp_path / "delivery.zip"
+    path.write_text("not a zip")
+
+    with pytest.raises(InvalidBundleError, match=f"{re.escape(str(path))}.*not a ZIP"):
+        load_zip(path)
+
+
+@pytest.mark.parametrize(
+    "entries",
+    [{}, {"README.txt": "Delivery from CSV2FHIR"}],
+    ids=["empty", "without_json"],
+)
+def test_load_zip_rejects_zip_without_json(tmp_path, entries):
+    path = _write_zip(tmp_path / "delivery.zip", entries)
+
+    with pytest.raises(InvalidBundleError, match="no JSON"):
+        load_zip(path)
+
+
+def test_load_zip_names_file_with_malformed_json(tmp_path):
+    text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
+    path = _write_zip(
+        tmp_path / "delivery.zip",
+        {"bundle_min.json": text, "broken.json": '{"resourceType": "Bundle", '},
+    )
+
+    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:broken\.json.*JSON"):
+        load_zip(path)
