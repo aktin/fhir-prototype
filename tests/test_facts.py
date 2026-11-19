@@ -45,10 +45,12 @@ def test_first_returns_none_without_path_or_match():
 
 def test_first_reads_start_from_datetime_or_period():
     with_datetime = make_observation()
-    with_period = make_observation(effectivePeriod={
-        "start": "2024-01-15T10:00:00+01:00",
-        "end": "2024-01-15T10:01:00+01:00",
-    })
+    with_period = make_observation(
+        effectivePeriod={
+            "start": "2024-01-15T10:00:00+01:00",
+            "end": "2024-01-15T10:01:00+01:00",
+        }
+    )
     del with_period["effectiveDateTime"]
 
     assert _first(with_datetime, START) == "2024-01-15T09:00:00+01:00"
@@ -102,10 +104,12 @@ def test_row_translates_observation_by_rule():
 
 
 def test_row_reads_period_of_observation():
-    observation = make_observation(effectivePeriod={
-        "start": "2024-01-15T10:00:00+01:00",
-        "end": "2024-01-15T10:01:00+01:00",
-    })
+    observation = make_observation(
+        effectivePeriod={
+            "start": "2024-01-15T10:00:00+01:00",
+            "end": "2024-01-15T10:01:00+01:00",
+        }
+    )
     del observation["effectiveDateTime"]
     index = BundleIndex(make_bundle(PATIENT, ENCOUNTER, observation))
 
@@ -222,11 +226,13 @@ def test_split_names_missing_concept_before_other_reasons():
 
 
 def test_split_separates_accepted_and_rejected_rows():
-    facts = pd.DataFrame([
-        make_fact(resource_id="o1"),
-        make_fact(resource_id="o2", concept_cd=None),
-        make_fact(resource_id="o3", nval_num=None),
-    ])
+    facts = pd.DataFrame(
+        [
+            make_fact(resource_id="o1"),
+            make_fact(resource_id="o2", concept_cd=None),
+            make_fact(resource_id="o3", nval_num=None),
+        ]
+    )
 
     result = _split(facts)
 
@@ -351,11 +357,14 @@ def test_build_facts_handles_bundle_without_fact_resources():
     assert list(result.facts.columns) == FACT_COLUMNS
 
 
-@pytest.mark.parametrize("fixture, facts, unmapped", [
-    ("bundle_min.json", 51, 10),
-    ("bundle_max_1.json", 201, 40),
-    ("bundle_max_2.json", 201, 40),
-])
+@pytest.mark.parametrize(
+    "fixture, facts, unmapped",
+    [
+        ("bundle_min.json", 51, 10),
+        ("bundle_max_1.json", 201, 40),
+        ("bundle_max_2.json", 201, 40),
+    ],
+)
 def test_build_facts_counts_in_fixtures(fixture, facts, unmapped):
     index = BundleIndex(load_bundle(FIXTURES / fixture))
 

@@ -24,6 +24,7 @@ dev = [
 
 [tool.ruff]
 src = ["src", "tests"]
+line-length = 120
 
 [tool.ruff.lint]
 ignore = ["B008"]

@@ -22,11 +22,7 @@ class BundleIndex:
             self._by_full_url[entry["fullUrl"]] = entry["resource"]
 
     def of_type(self, resource_type: str) -> list[Resource]:
-        return [
-            resource
-            for resource in self._by_full_url.values()
-            if resource["resourceType"] == resource_type
-        ]
+        return [resource for resource in self._by_full_url.values() if resource["resourceType"] == resource_type]
 
     def resolve(self, reference: str) -> Resource:
         try:
