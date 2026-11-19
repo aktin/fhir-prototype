@@ -33,6 +33,13 @@ def _is_root_json(name: str) -> bool:
 
 def load_zip(path: str | Path) -> list[dict[str, Any]]:
     """Read all bundles from the JSON files in the root of a ZIP archive."""
-    with zipfile.ZipFile(path) as archive:
+    try:
+        archive = zipfile.ZipFile(path)
+    except zipfile.BadZipFile as e:
+        raise InvalidBundleError(f"{path} is not a ZIP file") from e
+
+    with archive:
         names = sorted(name for name in archive.namelist() if _is_root_json(name))
+        if not names:
+            raise InvalidBundleError(f"{path} contains no JSON files")
         return [parse_bundle(archive.read(name).decode("utf-8"), f"{path}:{name}") for name in names]
