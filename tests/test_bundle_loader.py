@@ -72,3 +72,14 @@ def test_load_zip_returns_bundle_of_single_json(tmp_path):
 
     assert len(bundles) == 1
     assert bundles[0] == load_bundle(FIXTURES / "bundle_min.json")
+
+
+def test_load_zip_returns_bundles_sorted_by_file_name(tmp_path):
+    names = ["bundle_max_2.json", "bundle_min.json", "bundle_max_1.json"]
+    entries = {name: (FIXTURES / name).read_text(encoding="utf-8") for name in names}
+    path = _write_zip(tmp_path / "delivery.zip", entries)
+
+    bundles = load_zip(path)
+
+    assert len(bundles) == 3
+    assert bundles == [load_bundle(FIXTURES / name) for name in sorted(names)]
