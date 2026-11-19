@@ -12,3 +12,6 @@ wheels/
 # IDEA
 .idea
 /output/
+
+# lefthook
+lefthook-local.yml
