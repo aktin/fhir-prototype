@@ -83,3 +83,37 @@ def test_load_zip_returns_bundles_sorted_by_file_name(tmp_path):
 
     assert len(bundles) == 3
     assert bundles == [load_bundle(FIXTURES / name) for name in sorted(names)]
+
+
+def test_load_zip_ignores_entries_in_subfolders(tmp_path):
+    text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
+    path = _write_zip(
+        tmp_path / "delivery.zip",
+        {
+            "bundle_min.json": text,
+            "__MACOSX/._bundle_min.json": "not json at all",
+            "nested/other.json": json.dumps(make_bundle(PATIENT)),
+        },
+    )
+
+    bundles = load_zip(path)
+
+    assert bundles == [load_bundle(FIXTURES / "bundle_min.json")]
+
+
+def test_load_zip_ignores_entries_that_are_not_json(tmp_path):
+    text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
+    path = _write_zip(
+        tmp_path / "delivery.zip",
+        {
+            "README.txt": "Delivery from CSV2FHIR",
+            "bundle_min.json": text,
+            "notes.md": "# Notes",
+            "upper.JSON": json.dumps(make_bundle(PATIENT)),
+        },
+    )
+
+    bundles = load_zip(path)
+
+    assert len(bundles) == 2
+    assert bundles[0] == load_bundle(FIXTURES / "bundle_min.json")
