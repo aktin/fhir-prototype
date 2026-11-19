@@ -1,10 +1,11 @@
 import pandas as pd
 import pytest
 
+from fhir_prototype import pipeline
 from fhir_prototype.bundle_loader import InvalidBundleError
 from fhir_prototype.importer import CsvImporter, Importer
 from fhir_prototype.pipeline import run
-from fhir_prototype.validation import BundleValidator
+from fhir_prototype.validation import BundleValidator, NoValidation
 from helpers import FIXTURES
 
 
@@ -19,6 +20,18 @@ class RecordingImporter(Importer):
 class RejectAll(BundleValidator):
     def is_valid(self, bundle):
         return False
+
+
+def _spy_no_validation(monkeypatch):
+    created = []
+
+    class SpyNoValidation(NoValidation):
+        def __init__(self):
+            super().__init__()
+            created.append(self)
+
+    monkeypatch.setattr(pipeline, "NoValidation", SpyNoValidation)
+    return created
 
 
 def test_run_hands_frames_and_result_to_importer():
@@ -50,3 +63,20 @@ def test_run_aborts_when_validator_rejects_bundle():
         run(FIXTURES / "bundle_min.json", importer, validator=RejectAll())
 
     assert importer.calls == []
+
+
+def test_run_without_validator_uses_no_validation(monkeypatch):
+    created = _spy_no_validation(monkeypatch)
+
+    run(FIXTURES / "bundle_min.json", RecordingImporter())
+
+    assert len(created) == 1
+
+
+def test_run_with_validator_does_not_fall_back(monkeypatch):
+    created = _spy_no_validation(monkeypatch)
+
+    with pytest.raises(InvalidBundleError):
+        run(FIXTURES / "bundle_min.json", RecordingImporter(), validator=RejectAll())
+
+    assert created == []
