@@ -1,11 +1,24 @@
 import json
 import zipfile
+import zlib
 from pathlib import Path
 from typing import Any
 
 
 class InvalidBundleError(ValueError):
     """Raised when the input is not a usable FHIR bundle."""
+
+
+_ENTRY_READ_ERRORS = (UnicodeDecodeError, zipfile.BadZipFile, zlib.error, RuntimeError, NotImplementedError)
+
+
+def _load_entry(archive: zipfile.ZipFile, path: str | Path, name: str) -> dict[str, Any]:
+    source = f"{path}:{name}"
+    try:
+        text = archive.read(name).decode("utf-8")
+    except _ENTRY_READ_ERRORS as e:
+        raise InvalidBundleError(f"{source} could not be read: {e}") from e
+    return parse_bundle(text, source)
 
 
 def load_bundle(path: str | Path) -> dict[str, Any]:
@@ -15,6 +28,7 @@ def load_bundle(path: str | Path) -> dict[str, Any]:
 
 
 def parse_bundle(text: str, source: str) -> dict[str, Any]:
+    """Parse JSON text into a FHIR bundle dict, naming source in errors."""
     try:
         data = json.loads(text)
     except json.JSONDecodeError as e:
@@ -27,10 +41,6 @@ def parse_bundle(text: str, source: str) -> dict[str, Any]:
     return data
 
 
-def _is_root_json(name: str) -> bool:
-    return "/" not in name and name.lower().endswith(".json")
-
-
 def load_zip(path: str | Path) -> list[dict[str, Any]]:
     """Read all bundles from the JSON files in the root of a ZIP archive."""
     try:
@@ -39,7 +49,7 @@ def load_zip(path: str | Path) -> list[dict[str, Any]]:
         raise InvalidBundleError(f"{path} is not a ZIP file") from e
 
     with archive:
-        names = sorted(name for name in archive.namelist() if _is_root_json(name))
+        names = sorted(name for name in archive.namelist() if "/" not in name and name.lower().endswith(".json"))
         if not names:
             raise InvalidBundleError(f"{path} contains no JSON files")
-        return [parse_bundle(archive.read(name).decode("utf-8"), f"{path}:{name}") for name in names]
+        return [_load_entry(archive, path, name) for name in names]
