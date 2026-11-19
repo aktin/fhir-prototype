@@ -4,7 +4,7 @@ import zipfile
 
 import pytest
 
-from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle, load_zip, parse_bundle
+from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle, load_zip
 from helpers import FIXTURES, PATIENT, make_bundle
 
 
@@ -28,32 +28,7 @@ def test_rejects_malformed_json(tmp_path):
     path = tmp_path / "broken.json"
     path.write_text('{"resourceType": "Bundle", ')
 
-    with pytest.raises(InvalidBundleError, match="JSON"):
-        load_bundle(path)
-
-
-def test_parse_bundle_returns_bundle_dict():
-    bundle = parse_bundle(json.dumps(make_bundle(PATIENT)), "inline")
-
-    assert bundle["resourceType"] == "Bundle"
-    assert bundle["entry"][0]["resource"] == PATIENT
-
-
-def test_parse_bundle_names_source_when_json_is_malformed():
-    with pytest.raises(InvalidBundleError, match="broken.json.*JSON"):
-        parse_bundle('{"resourceType": "Bundle", ', "broken.json")
-
-
-def test_parse_bundle_names_source_when_not_a_bundle():
-    with pytest.raises(InvalidBundleError, match="patient.json.*Bundle"):
-        parse_bundle(json.dumps(PATIENT), "patient.json")
-
-
-def test_load_bundle_names_file_in_error(tmp_path):
-    path = tmp_path / "broken.json"
-    path.write_text('{"resourceType": "Bundle", ')
-
-    with pytest.raises(InvalidBundleError, match=re.escape(str(path))):
+    with pytest.raises(InvalidBundleError, match=f"{re.escape(str(path))}.*JSON"):
         load_bundle(path)
 
 
@@ -64,16 +39,6 @@ def _write_zip(path, entries):
     return path
 
 
-def test_load_zip_returns_bundle_of_single_json(tmp_path):
-    text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
-    path = _write_zip(tmp_path / "delivery.zip", {"bundle_min.json": text})
-
-    bundles = load_zip(path)
-
-    assert len(bundles) == 1
-    assert bundles[0] == load_bundle(FIXTURES / "bundle_min.json")
-
-
 def test_load_zip_returns_bundles_sorted_by_file_name(tmp_path):
     names = ["bundle_max_2.json", "bundle_min.json", "bundle_max_1.json"]
     entries = {name: (FIXTURES / name).read_text(encoding="utf-8") for name in names}
@@ -81,7 +46,6 @@ def test_load_zip_returns_bundles_sorted_by_file_name(tmp_path):
 
     bundles = load_zip(path)
 
-    assert len(bundles) == 3
     assert bundles == [load_bundle(FIXTURES / name) for name in sorted(names)]
 
 
@@ -147,4 +111,11 @@ def test_load_zip_names_file_with_malformed_json(tmp_path):
     )
 
     with pytest.raises(InvalidBundleError, match=r"delivery\.zip:broken\.json.*JSON"):
+        load_zip(path)
+
+
+def test_load_zip_names_entry_that_is_not_utf8(tmp_path):
+    path = _write_zip(tmp_path / "delivery.zip", {"bad.json": b"\xff"})
+
+    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bad\.json"):
         load_zip(path)
