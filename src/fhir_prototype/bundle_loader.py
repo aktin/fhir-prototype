@@ -27,8 +27,12 @@ def parse_bundle(text: str, source: str) -> dict[str, Any]:
     return data
 
 
+def _is_root_json(name: str) -> bool:
+    return "/" not in name and name.lower().endswith(".json")
+
+
 def load_zip(path: str | Path) -> list[dict[str, Any]]:
+    """Read all bundles from the JSON files in the root of a ZIP archive."""
     with zipfile.ZipFile(path) as archive:
-        return [
-            parse_bundle(archive.read(name).decode("utf-8"), f"{path}:{name}") for name in sorted(archive.namelist())
-        ]
+        names = sorted(name for name in archive.namelist() if _is_root_json(name))
+        return [parse_bundle(archive.read(name).decode("utf-8"), f"{path}:{name}") for name in names]
