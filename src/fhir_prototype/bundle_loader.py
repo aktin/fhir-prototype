@@ -29,4 +29,6 @@ def parse_bundle(text: str, source: str) -> dict[str, Any]:
 
 def load_zip(path: str | Path) -> list[dict[str, Any]]:
     with zipfile.ZipFile(path) as archive:
-        return [parse_bundle(archive.read(name).decode("utf-8"), f"{path}:{name}") for name in archive.namelist()]
+        return [
+            parse_bundle(archive.read(name).decode("utf-8"), f"{path}:{name}") for name in sorted(archive.namelist())
+        ]
