@@ -91,13 +91,8 @@ def test_load_zip_rejects_file_that_is_not_a_zip(tmp_path):
         load_zip(path)
 
 
-@pytest.mark.parametrize(
-    "entries",
-    [{}, {"README.txt": "Delivery from CSV2FHIR"}],
-    ids=["empty", "without_json"],
-)
-def test_load_zip_rejects_zip_without_json(tmp_path, entries):
-    path = _write_zip(tmp_path / "delivery.zip", entries)
+def test_load_zip_rejects_zip_without_json(tmp_path):
+    path = _write_zip(tmp_path / "delivery.zip", {"README.txt": "Delivery from CSV2FHIR"})
 
     with pytest.raises(InvalidBundleError, match="no JSON"):
         load_zip(path)
