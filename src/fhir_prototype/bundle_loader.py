@@ -52,12 +52,13 @@ def _parse_bundle(text: str, source: str) -> dict[str, Any]:
     return data
 
 
-def load_zip(path: str | Path) -> list[dict[str, Any]]:
+def load_zip(path: str | Path) -> dict[str, dict[str, Any]]:
     """Read all bundles from the JSON files in the root of a ZIP archive.
 
-    Entries that are not valid JSON or not a Bundle are skipped with a warning.
-    Entries that cannot be read raise InvalidBundleError, because they point to
-    a damaged archive.
+    Returns a dict from file name to bundle, sorted by file name. Entries that
+    are not valid JSON or not a Bundle are skipped with a warning. Entries that
+    cannot be read raise InvalidBundleError, because they point to a damaged
+    archive.
     """
     try:
         archive = zipfile.ZipFile(path)
@@ -72,12 +73,12 @@ def load_zip(path: str | Path) -> list[dict[str, Any]]:
         if duplicates:
             raise InvalidBundleError(f"{path} contains duplicate entries: {', '.join(duplicates)}")
 
-        bundles: list[dict[str, Any]] = []
+        bundles: dict[str, dict[str, Any]] = {}
         for name in names:
             source = f"{path}:{name}"
             text = _read_entry(archive, name, source)
             try:
-                bundles.append(_parse_bundle(text, source))
+                bundles[name] = _parse_bundle(text, source)
             except InvalidBundleError as e:
                 logger.warning("Skipping ZIP entry: %s", e)
 

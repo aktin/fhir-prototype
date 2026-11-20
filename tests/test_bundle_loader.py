@@ -5,7 +5,7 @@ import zipfile
 import pytest
 
 from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle, load_zip
-from helpers import FIXTURES, PATIENT, make_bundle
+from helpers import FIXTURES, PATIENT, make_bundle, write_zip
 
 
 def test_loads_bundle_from_file():
@@ -32,26 +32,20 @@ def test_rejects_malformed_json(tmp_path):
         load_bundle(path)
 
 
-def _write_zip(path, entries):
-    with zipfile.ZipFile(path, "w") as archive:
-        for name, content in entries.items():
-            archive.writestr(name, content)
-    return path
-
-
 def test_load_zip_returns_bundles_sorted_by_file_name(tmp_path):
     names = ["bundle_max_2.json", "bundle_min.json", "bundle_max_1.json"]
     entries = {name: (FIXTURES / name).read_text(encoding="utf-8") for name in names}
-    path = _write_zip(tmp_path / "delivery.zip", entries)
+    path = write_zip(tmp_path / "delivery.zip", entries)
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / name) for name in sorted(names)]
+    assert list(bundles) == sorted(names)
+    assert bundles == {name: load_bundle(FIXTURES / name) for name in names}
 
 
 def test_load_zip_ignores_entries_in_subfolders(tmp_path):
     text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
-    path = _write_zip(
+    path = write_zip(
         tmp_path / "delivery.zip",
         {
             "bundle_min.json": text,
@@ -62,12 +56,12 @@ def test_load_zip_ignores_entries_in_subfolders(tmp_path):
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / "bundle_min.json")]
+    assert bundles == {"bundle_min.json": load_bundle(FIXTURES / "bundle_min.json")}
 
 
 def test_load_zip_ignores_entries_that_are_not_json(tmp_path):
     text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
-    path = _write_zip(
+    path = write_zip(
         tmp_path / "delivery.zip",
         {
             "README.txt": "Delivery from CSV2FHIR",
@@ -80,7 +74,7 @@ def test_load_zip_ignores_entries_that_are_not_json(tmp_path):
     bundles = load_zip(path)
 
     assert len(bundles) == 2
-    assert bundles[0] == load_bundle(FIXTURES / "bundle_min.json")
+    assert bundles == {"bundle_min.json": load_bundle(FIXTURES / "bundle_min.json"), "upper.JSON": make_bundle(PATIENT)}
 
 
 def test_load_zip_rejects_file_that_is_not_a_zip(tmp_path):
@@ -92,7 +86,7 @@ def test_load_zip_rejects_file_that_is_not_a_zip(tmp_path):
 
 
 def test_load_zip_rejects_zip_without_json(tmp_path):
-    path = _write_zip(tmp_path / "delivery.zip", {"README.txt": "Delivery from CSV2FHIR"})
+    path = write_zip(tmp_path / "delivery.zip", {"README.txt": "Delivery from CSV2FHIR"})
 
     with pytest.raises(InvalidBundleError, match="no JSON"):
         load_zip(path)
@@ -101,28 +95,28 @@ def test_load_zip_rejects_zip_without_json(tmp_path):
 def test_load_zip_skips_malformed_json_with_warning(tmp_path, caplog):
     entries = {name: (FIXTURES / name).read_text(encoding="utf-8") for name in ["bundle_min.json", "bundle_max_1.json"]}
     entries["broken.json"] = '{"resourceType": "Bundle", '
-    path = _write_zip(tmp_path / "delivery.zip", entries)
+    path = write_zip(tmp_path / "delivery.zip", entries)
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / "bundle_max_1.json"), load_bundle(FIXTURES / "bundle_min.json")]
+    assert bundles == {name: load_bundle(FIXTURES / name) for name in ["bundle_max_1.json", "bundle_min.json"]}
     assert len(caplog.records) == 1
     assert re.search(r"delivery\.zip:broken\.json.*JSON", caplog.records[0].getMessage())
 
 
 def test_load_zip_skips_json_that_is_not_a_bundle(tmp_path, caplog):
     text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
-    path = _write_zip(tmp_path / "delivery.zip", {"bundle_min.json": text, "patient.json": json.dumps(PATIENT)})
+    path = write_zip(tmp_path / "delivery.zip", {"bundle_min.json": text, "patient.json": json.dumps(PATIENT)})
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / "bundle_min.json")]
+    assert bundles == {"bundle_min.json": load_bundle(FIXTURES / "bundle_min.json")}
     assert len(caplog.records) == 1
     assert re.search(r"delivery\.zip:patient\.json.*Bundle", caplog.records[0].getMessage())
 
 
 def test_load_zip_rejects_zip_without_valid_bundle(tmp_path, caplog):
-    path = _write_zip(
+    path = write_zip(
         tmp_path / "delivery.zip",
         {"broken.json": '{"resourceType": "Bundle", ', "patient.json": json.dumps(PATIENT)},
     )
@@ -136,7 +130,7 @@ def test_load_zip_rejects_zip_without_valid_bundle(tmp_path, caplog):
 
 
 def test_load_zip_names_entry_that_is_not_utf8(tmp_path):
-    path = _write_zip(tmp_path / "delivery.zip", {"bad.json": b"\xff"})
+    path = write_zip(tmp_path / "delivery.zip", {"bad.json": b"\xff"})
 
     with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bad\.json could not be read"):
         load_zip(path)
@@ -172,9 +166,9 @@ def test_load_bundle_accepts_utf8_bom(tmp_path):
 
 
 def test_load_zip_accepts_utf8_bom(tmp_path):
-    path = _write_zip(tmp_path / "delivery.zip", {"bom.json": "\ufeff" + json.dumps(make_bundle(PATIENT))})
+    path = write_zip(tmp_path / "delivery.zip", {"bom.json": "\ufeff" + json.dumps(make_bundle(PATIENT))})
 
-    assert load_zip(path) == [make_bundle(PATIENT)]
+    assert load_zip(path) == {"bom.json": make_bundle(PATIENT)}
 
 
 def test_load_zip_rejects_duplicate_entry_names(tmp_path):
