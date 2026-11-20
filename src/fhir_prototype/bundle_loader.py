@@ -23,7 +23,6 @@ def _load_entry(archive: zipfile.ZipFile, path: str | Path, name: str) -> dict[s
         EOFError,
         OSError,
         RuntimeError,
-        NotImplementedError,
     ) as e:
         raise InvalidBundleError(f"{source} could not be read: {e}") from e
     return _parse_bundle(text, source)
@@ -34,7 +33,7 @@ def load_bundle(path: str | Path) -> dict[str, Any]:
     try:
         text = Path(path).read_text(encoding="utf_8_sig")
     except UnicodeDecodeError as e:
-        raise InvalidBundleError(f"{path} could not be read: {e}")
+        raise InvalidBundleError(f"{path} could not be read: {e}") from e
     return _parse_bundle(text, str(path))
 
 
