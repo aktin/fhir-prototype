@@ -114,3 +114,11 @@ def test_load_zip_names_entry_that_is_not_utf8(tmp_path):
 
     with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bad\.json"):
         load_zip(path)
+
+
+def test_load_bundle_names_file_that_is_not_utf8(tmp_path):
+    path = tmp_path / "bad.json"
+    path.write_bytes(b"\xff")
+
+    with pytest.raises(InvalidBundleError, match=re.escape(str(path))):
+        load_bundle(path)
