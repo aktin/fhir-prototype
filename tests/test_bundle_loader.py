@@ -112,7 +112,21 @@ def test_load_zip_names_file_with_malformed_json(tmp_path):
 def test_load_zip_names_entry_that_is_not_utf8(tmp_path):
     path = _write_zip(tmp_path / "delivery.zip", {"bad.json": b"\xff"})
 
-    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bad\.json"):
+    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bad\.json could not be read"):
+        load_zip(path)
+
+
+def test_load_zip_names_entry_with_crc_mismatch(tmp_path):
+    content = json.dumps(make_bundle(PATIENT)).encode("utf-8")
+    path = tmp_path / "delivery.zip"
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as archive:
+        archive.writestr("bundle.json", content)
+
+    data = bytearray(path.read_bytes())
+    data[data.index(content)] ^= 0x01
+    path.write_bytes(bytes(data))
+
+    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bundle\.json could not be read"):
         load_zip(path)
 
 
