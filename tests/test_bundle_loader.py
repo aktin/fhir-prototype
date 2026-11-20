@@ -46,7 +46,8 @@ def test_load_zip_returns_bundles_sorted_by_file_name(tmp_path):
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / name) for name in sorted(names)]
+    assert list(bundles) == sorted(names)
+    assert bundles == {name: load_bundle(FIXTURES / name) for name in names}
 
 
 def test_load_zip_ignores_entries_in_subfolders(tmp_path):
@@ -62,7 +63,7 @@ def test_load_zip_ignores_entries_in_subfolders(tmp_path):
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / "bundle_min.json")]
+    assert bundles == {"bundle_min.json": load_bundle(FIXTURES / "bundle_min.json")}
 
 
 def test_load_zip_ignores_entries_that_are_not_json(tmp_path):
@@ -80,7 +81,7 @@ def test_load_zip_ignores_entries_that_are_not_json(tmp_path):
     bundles = load_zip(path)
 
     assert len(bundles) == 2
-    assert bundles[0] == load_bundle(FIXTURES / "bundle_min.json")
+    assert bundles == {"bundle_min.json": load_bundle(FIXTURES / "bundle_min.json"), "upper.JSON": make_bundle(PATIENT)}
 
 
 def test_load_zip_rejects_file_that_is_not_a_zip(tmp_path):
@@ -105,7 +106,7 @@ def test_load_zip_skips_malformed_json_with_warning(tmp_path, caplog):
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / "bundle_max_1.json"), load_bundle(FIXTURES / "bundle_min.json")]
+    assert bundles == {name: load_bundle(FIXTURES / name) for name in ["bundle_max_1.json", "bundle_min.json"]}
     assert len(caplog.records) == 1
     assert re.search(r"delivery\.zip:broken\.json.*JSON", caplog.records[0].getMessage())
 
@@ -116,7 +117,7 @@ def test_load_zip_skips_json_that_is_not_a_bundle(tmp_path, caplog):
 
     bundles = load_zip(path)
 
-    assert bundles == [load_bundle(FIXTURES / "bundle_min.json")]
+    assert bundles == {"bundle_min.json": load_bundle(FIXTURES / "bundle_min.json")}
     assert len(caplog.records) == 1
     assert re.search(r"delivery\.zip:patient\.json.*Bundle", caplog.records[0].getMessage())
 
@@ -174,7 +175,7 @@ def test_load_bundle_accepts_utf8_bom(tmp_path):
 def test_load_zip_accepts_utf8_bom(tmp_path):
     path = _write_zip(tmp_path / "delivery.zip", {"bom.json": "\ufeff" + json.dumps(make_bundle(PATIENT))})
 
-    assert load_zip(path) == [make_bundle(PATIENT)]
+    assert load_zip(path) == {"bom.json": make_bundle(PATIENT)}
 
 
 def test_load_zip_rejects_duplicate_entry_names(tmp_path):
