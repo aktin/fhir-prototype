@@ -135,3 +135,14 @@ def test_load_zip_accepts_utf8_bom(tmp_path):
     path = _write_zip(tmp_path / "delivery.zip", {"bom.json": "\ufeff" + json.dumps(make_bundle(PATIENT))})
 
     assert load_zip(path) == [make_bundle(PATIENT)]
+
+
+def test_load_zip_rejects_duplicate_entry_names(tmp_path):
+    path = tmp_path / "delivery.zip"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("bundle.json", json.dumps(make_bundle(PATIENT)))
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.writestr("bundle.json", json.dumps(make_bundle(PATIENT)))
+
+    with pytest.raises(InvalidBundleError, match=r"delivery\.zip.*duplicate.*bundle\.json"):
+        load_zip(path)

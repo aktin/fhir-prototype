@@ -2,6 +2,7 @@ import json
 import lzma
 import zipfile
 import zlib
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -62,4 +63,7 @@ def load_zip(path: str | Path) -> list[dict[str, Any]]:
         names = sorted(name for name in archive.namelist() if "/" not in name and name.lower().endswith(".json"))
         if not names:
             raise InvalidBundleError(f"{path} contains no JSON files")
+        duplicates = [name for name, count in Counter(names).items() if count > 1]
+        if duplicates:
+            raise InvalidBundleError(f"{path} contains duplicate entries: {', '.join(duplicates)}")
         return [_load_entry(archive, path, name) for name in names]
