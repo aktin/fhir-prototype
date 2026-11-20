@@ -1,26 +1,54 @@
+import logging
 from pathlib import Path
+from typing import Any
 
-from fhir_prototype.bundle_index import BundleIndex
-from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle
+from fhir_prototype.bundle_index import BundleIndex, UnresolvedReferenceError
+from fhir_prototype.bundle_loader import InvalidBundleError, load_zip
 from fhir_prototype.dates import parse_dates
-from fhir_prototype.facts import MappingResult, build_facts
+from fhir_prototype.facts import build_facts
 from fhir_prototype.frames import bundle_to_frames
 from fhir_prototype.importer import Importer
 from fhir_prototype.mapping import load_mapping
 from fhir_prototype.validation import BundleValidator, NoValidation
 
+logger = logging.getLogger(__name__)
 
-def run(
-    bundle_path: str | Path,
+
+def _run_bundle(
+    name: str,
+    bundle: dict[str, Any],
     importer: Importer,
-    validator: BundleValidator = NoValidation(),
-) -> MappingResult:
-    """Run the whole pipeline for one bundle file and hand the result to the importer."""
-    bundle = load_bundle(bundle_path)
+    validator: BundleValidator,
+    mapping: list[dict[Any, Any]],
+) -> None:
+    """Run all steps for one bundle and hand the result to the importer."""
     if not validator.is_valid(bundle):
-        raise InvalidBundleError(f"Bundle {bundle_path} failed validation")
+        raise InvalidBundleError(f"{name} failed validation")
     index = BundleIndex(bundle)
     frames = parse_dates(bundle_to_frames(index))
-    result = build_facts(index, load_mapping())
-    importer.write(Path(bundle_path).name, frames, result)
-    return result
+    result = build_facts(index, mapping)
+    importer.write(name, frames, result)
+
+
+def run(
+    zip_path: str | Path,
+    importer: Importer,
+    validator: BundleValidator = NoValidation(),
+) -> None:
+    """Run the pipeline for every bundle in a ZIP file.
+
+    Bundles that fail are skipped with a warning. Raises InvalidBundleError if
+    no bundle could be processed.
+    """
+    mapping = load_mapping()
+    processed = 0
+    for name, bundle in load_zip(zip_path).items():
+        try:
+            _run_bundle(name, bundle, importer, validator, mapping)
+        except (InvalidBundleError, UnresolvedReferenceError) as e:
+            logger.warning("Skipping bundle %s: %s", name, e)
+        else:
+            processed += 1
+
+    if processed == 0:
+        raise InvalidBundleError(f"{zip_path}: no bundle could be processed")
