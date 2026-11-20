@@ -1,4 +1,5 @@
 import json
+import lzma
 import zipfile
 import zlib
 from pathlib import Path
@@ -9,14 +10,20 @@ class InvalidBundleError(ValueError):
     """Raised when the input is not a usable FHIR bundle."""
 
 
-_ENTRY_READ_ERRORS = (UnicodeDecodeError, zipfile.BadZipFile, zlib.error, RuntimeError, NotImplementedError)
-
-
 def _load_entry(archive: zipfile.ZipFile, path: str | Path, name: str) -> dict[str, Any]:
     source = f"{path}:{name}"
     try:
         text = archive.read(name).decode("utf-8")
-    except _ENTRY_READ_ERRORS as e:
+    except (
+        UnicodeDecodeError,
+        zipfile.BadZipFile,
+        zlib.error,
+        lzma.LZMAError,
+        EOFError,
+        OSError,
+        RuntimeError,
+        NotImplementedError,
+    ) as e:
         raise InvalidBundleError(f"{source} could not be read: {e}") from e
     return _parse_bundle(text, source)
 
