@@ -18,16 +18,16 @@ def _load_entry(archive: zipfile.ZipFile, path: str | Path, name: str) -> dict[s
         text = archive.read(name).decode("utf-8")
     except _ENTRY_READ_ERRORS as e:
         raise InvalidBundleError(f"{source} could not be read: {e}") from e
-    return parse_bundle(text, source)
+    return _parse_bundle(text, source)
 
 
 def load_bundle(path: str | Path) -> dict[str, Any]:
     """Read a JSON file and return it as a FHIR bundle dict."""
     text = Path(path).read_text(encoding="utf-8")
-    return parse_bundle(text, str(path))
+    return _parse_bundle(text, str(path))
 
 
-def parse_bundle(text: str, source: str) -> dict[str, Any]:
+def _parse_bundle(text: str, source: str) -> dict[str, Any]:
     """Parse JSON text into a FHIR bundle dict, naming source in errors."""
     try:
         data = json.loads(text)
