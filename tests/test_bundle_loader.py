@@ -122,3 +122,16 @@ def test_load_bundle_names_file_that_is_not_utf8(tmp_path):
 
     with pytest.raises(InvalidBundleError, match=re.escape(str(path))):
         load_bundle(path)
+
+
+def test_load_bundle_accepts_utf8_bom(tmp_path):
+    path = tmp_path / "bom.json"
+    path.write_text("\ufeff" + json.dumps(make_bundle(PATIENT)), encoding="utf-8")
+
+    assert load_bundle(path) == make_bundle(PATIENT)
+
+
+def test_load_zip_accepts_utf8_bom(tmp_path):
+    path = _write_zip(tmp_path / "delivery.zip", {"bom.json": "\ufeff" + json.dumps(make_bundle(PATIENT))})
+
+    assert load_zip(path) == [make_bundle(PATIENT)]
