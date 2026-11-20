@@ -1,3 +1,4 @@
+import zipfile
 from pathlib import Path
 
 BASE = "https://fhir.example.org"
@@ -67,3 +68,10 @@ def make_procedure(**overrides):
     }
     procedure.update(overrides)
     return procedure
+
+
+def write_zip(path, entries):
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content)
+    return path
