@@ -163,7 +163,7 @@ def test_load_zip_names_entry_with_crc_mismatch(tmp_path, caplog):
     with caplog.at_level(logging.WARNING, logger=LOGGER), pytest.raises(InvalidBundleError, match="no valid bundles"):
         load_zip(path)
 
-    assert re.search(r"delivery\.zip:bad\.json could not be read", caplog.records[0].getMessage())
+    assert re.search(r"delivery\.zip:bundle\.json could not be read", caplog.records[0].getMessage())
 
 
 def test_load_bundle_names_file_that_is_not_utf8(tmp_path):
