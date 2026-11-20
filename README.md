@@ -22,13 +22,22 @@ uv run pytest
 
 ## Run
 
-Run steps 1 to 3 for one bundle and write the result as CSV:
+Run steps 1 to 3 for all bundles of one ZIP file and write the result as CSV.
+The test fixtures can be packed into a ZIP like this:
 
 ```bash
-uv run python -c "from fhir_prototype.importer import CsvImporter; from fhir_prototype.pipeline import run; run('tests/fixtures/bundle_max_1.json', CsvImporter('output'))"
+uv run python -m zipfile -c delivery.zip tests/fixtures/*.json
 ```
 
-The first argument is the bundle file, the second is the output folder. It is created if it does not exist and then contains four files:
+Then run the pipeline:
+
+```bash
+uv run python -c "from fhir_prototype.importer import CsvImporter; from fhir_prototype.pipeline import run; run('delivery.zip', CsvImporter('output'))"
+```
+
+The first argument is the ZIP file, the second is the output folder. It is
+created if it does not exist and then contains one subfolder per JSON file in
+the ZIP (for example `output/bundle_min/`) with four files:
 
 | File | Content |
 |---|---|
@@ -36,6 +45,8 @@ The first argument is the bundle file, the second is the output folder. It is cr
 | `encounters.csv` | one row per encounter in the bundle |
 | `facts.csv` | rows that have an i2b2 concept and can be imported |
 | `unmapped.csv` | rows without a concept in the mapping table, they are not imported |
+
+Bundles that cannot be processed are skipped with a warning.
 ## Mapping
 
 `src/fhir_prototype/icu_mapping.json` assigns an i2b2 `concept_cd` to each FHIR
