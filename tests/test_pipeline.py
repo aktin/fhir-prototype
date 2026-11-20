@@ -12,8 +12,8 @@ class RecordingImporter(Importer):
     def __init__(self):
         self.calls = []
 
-    def write(self, frames, result):
-        self.calls.append((frames, result))
+    def write(self, name, frames, result):
+        self.calls.append((name, frames, result))
 
 
 class RejectAll(BundleValidator):
@@ -27,7 +27,8 @@ def test_run_hands_frames_and_result_to_importer():
     result = run(FIXTURES / "bundle_min.json", importer)
 
     assert len(importer.calls) == 1
-    frames, written = importer.calls[0]
+    name, frames, written = importer.calls[0]
+    assert name == "bundle_min.json"
     assert written is result
     assert len(frames.patients) == 1
     assert len(frames.encounters) == 1
@@ -36,8 +37,8 @@ def test_run_hands_frames_and_result_to_importer():
 def test_run_writes_facts_and_unmapped_csv(tmp_path):
     run(FIXTURES / "bundle_min.json", CsvImporter(tmp_path))
 
-    facts = pd.read_csv(tmp_path / "facts.csv")
-    unmapped = pd.read_csv(tmp_path / "unmapped.csv")
+    facts = pd.read_csv(tmp_path / "bundle_min" / "facts.csv")
+    unmapped = pd.read_csv(tmp_path / "bundle_min" / "unmapped.csv")
     assert len(facts) == 51
     assert len(unmapped) == 10
     assert facts["concept_cd"].notna().all()
