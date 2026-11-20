@@ -22,5 +22,5 @@ def run(
     index = BundleIndex(bundle)
     frames = parse_dates(bundle_to_frames(index))
     result = build_facts(index, load_mapping())
-    importer.write(frames, result)
+    importer.write(Path(bundle_path).name, frames, result)
     return result
