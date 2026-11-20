@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import zipfile
 
@@ -6,6 +7,8 @@ import pytest
 
 from fhir_prototype.bundle_loader import InvalidBundleError, load_bundle, load_zip
 from helpers import FIXTURES, PATIENT, make_bundle
+
+LOGGER = "fhir_prototype.bundle_loader"
 
 
 def test_loads_bundle_from_file():
@@ -98,25 +101,56 @@ def test_load_zip_rejects_zip_without_json(tmp_path):
         load_zip(path)
 
 
-def test_load_zip_names_file_with_malformed_json(tmp_path):
+def test_load_zip_skips_malformed_json_with_warning(tmp_path, caplog):
+    entries = {name: (FIXTURES / name).read_text(encoding="utf-8") for name in ["bundle_min.json", "bundle_max_1.json"]}
+    entries["broken.json"] = '{"resourceType": "Bundle", '
+    path = _write_zip(tmp_path / "delivery.zip", entries)
+
+    with caplog.at_level(logging.WARNING, logger=LOGGER):
+        bundles = load_zip(path)
+
+    assert bundles == [load_bundle(FIXTURES / "bundle_max_1.json"), load_bundle(FIXTURES / "bundle_min.json")]
+    assert len(caplog.records) == 1
+    assert re.search(r"delivery\.zip:broken\.json.*JSON", caplog.records[0].getMessage())
+
+
+def test_load_zip_skips_json_that_is_not_a_bundle(tmp_path, caplog):
     text = (FIXTURES / "bundle_min.json").read_text(encoding="utf-8")
+    path = _write_zip(tmp_path / "delivery.zip", {"bundle_min.json": text, "patient.json": json.dumps(PATIENT)})
+
+    with caplog.at_level(logging.WARNING, logger=LOGGER):
+        bundles = load_zip(path)
+
+    assert bundles == [load_bundle(FIXTURES / "bundle_min.json")]
+    assert len(caplog.records) == 1
+    assert re.search(r"delivery\.zip:patient\.json.*Bundle", caplog.records[0].getMessage())
+
+
+def test_load_zip_rejects_zip_without_valid_bundle(tmp_path, caplog):
     path = _write_zip(
         tmp_path / "delivery.zip",
-        {"bundle_min.json": text, "broken.json": '{"resourceType": "Bundle", '},
+        {"broken.json": '{"resourceType": "Bundle", ', "patient.json": json.dumps(PATIENT)},
     )
 
-    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:broken\.json.*JSON"):
+    with (
+        caplog.at_level(logging.WARNING, logger=LOGGER),
+        pytest.raises(InvalidBundleError, match=r"delivery\.zip contains no valid bundles"),
+    ):
         load_zip(path)
 
+    assert len(caplog.records) == 2
 
-def test_load_zip_names_entry_that_is_not_utf8(tmp_path):
+
+def test_load_zip_names_entry_that_is_not_utf8(tmp_path, caplog):
     path = _write_zip(tmp_path / "delivery.zip", {"bad.json": b"\xff"})
 
-    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bad\.json could not be read"):
+    with caplog.at_level(logging.WARNING, logger=LOGGER), pytest.raises(InvalidBundleError, match="no valid bundles"):
         load_zip(path)
 
+    assert re.search(r"delivery\.zip:bad\.json could not be read", caplog.records[0].getMessage())
 
-def test_load_zip_names_entry_with_crc_mismatch(tmp_path):
+
+def test_load_zip_names_entry_with_crc_mismatch(tmp_path, caplog):
     content = json.dumps(make_bundle(PATIENT)).encode("utf-8")
     path = tmp_path / "delivery.zip"
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as archive:
@@ -126,8 +160,10 @@ def test_load_zip_names_entry_with_crc_mismatch(tmp_path):
     data[data.index(content)] ^= 0x01
     path.write_bytes(bytes(data))
 
-    with pytest.raises(InvalidBundleError, match=r"delivery\.zip:bundle\.json could not be read"):
+    with caplog.at_level(logging.WARNING, logger=LOGGER), pytest.raises(InvalidBundleError, match="no valid bundles"):
         load_zip(path)
+
+    assert re.search(r"delivery\.zip:bad\.json could not be read", caplog.records[0].getMessage())
 
 
 def test_load_bundle_names_file_that_is_not_utf8(tmp_path):
