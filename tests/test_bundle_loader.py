@@ -160,3 +160,8 @@ def test_load_zip_rejects_duplicate_entry_names(tmp_path):
 
     with pytest.raises(InvalidBundleError, match=r"delivery\.zip.*duplicate.*bundle\.json"):
         load_zip(path)
+
+
+def test_load_zip_raises_file_not_found_for_missing_archive(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_zip(tmp_path / "missing.zip")
