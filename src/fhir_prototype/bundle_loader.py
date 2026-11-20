@@ -14,10 +14,9 @@ class InvalidBundleError(ValueError):
     """Raised when the input is not a usable FHIR bundle."""
 
 
-def _load_entry(archive: zipfile.ZipFile, path: str | Path, name: str) -> dict[str, Any]:
-    source = f"{path}:{name}"
+def _read_entry(archive: zipfile.ZipFile, name: str, source: str) -> str:
     try:
-        text = archive.read(name).decode("utf_8_sig")
+        return archive.read(name).decode("utf_8_sig")
     except (
         UnicodeDecodeError,
         zipfile.BadZipFile,
@@ -28,7 +27,6 @@ def _load_entry(archive: zipfile.ZipFile, path: str | Path, name: str) -> dict[s
         RuntimeError,
     ) as e:
         raise InvalidBundleError(f"{source} could not be read: {e}") from e
-    return _parse_bundle(text, source)
 
 
 def load_bundle(path: str | Path) -> dict[str, Any]:
@@ -57,7 +55,9 @@ def _parse_bundle(text: str, source: str) -> dict[str, Any]:
 def load_zip(path: str | Path) -> list[dict[str, Any]]:
     """Read all bundles from the JSON files in the root of a ZIP archive.
 
-    Entries that cannot be loaded as a bundle are skipped with a warning.
+    Entries that are not valid JSON or not a Bundle are skipped with a warning.
+    Entries that cannot be read raise InvalidBundleError, because they point to
+    a damaged archive.
     """
     try:
         archive = zipfile.ZipFile(path)
@@ -74,8 +74,10 @@ def load_zip(path: str | Path) -> list[dict[str, Any]]:
 
         bundles: list[dict[str, Any]] = []
         for name in names:
+            source = f"{path}:{name}"
+            text = _read_entry(archive, name, source)
             try:
-                bundles.append(_load_entry(archive, path, name))
+                bundles.append(_parse_bundle(text, source))
             except InvalidBundleError as e:
                 logger.warning("Skipping ZIP entry: %s", e)
 
