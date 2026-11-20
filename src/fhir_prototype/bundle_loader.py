@@ -1,10 +1,13 @@
 import json
+import logging
 import lzma
 import zipfile
 import zlib
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidBundleError(ValueError):
@@ -52,7 +55,10 @@ def _parse_bundle(text: str, source: str) -> dict[str, Any]:
 
 
 def load_zip(path: str | Path) -> list[dict[str, Any]]:
-    """Read all bundles from the JSON files in the root of a ZIP archive."""
+    """Read all bundles from the JSON files in the root of a ZIP archive.
+
+    Entries that cannot be loaded as a bundle are skipped with a warning.
+    """
     try:
         archive = zipfile.ZipFile(path)
     except zipfile.BadZipFile as e:
@@ -65,4 +71,14 @@ def load_zip(path: str | Path) -> list[dict[str, Any]]:
         duplicates = [name for name, count in Counter(names).items() if count > 1]
         if duplicates:
             raise InvalidBundleError(f"{path} contains duplicate entries: {', '.join(duplicates)}")
-        return [_load_entry(archive, path, name) for name in names]
+
+        bundles: list[dict[str, Any]] = []
+        for name in names:
+            try:
+                bundles.append(_load_entry(archive, path, name))
+            except InvalidBundleError as e:
+                logger.warning("Skipping ZIP entry: %s", e)
+
+    if not bundles:
+        raise InvalidBundleError(f"{path} contains no valid bundles")
+    return bundles
