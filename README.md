@@ -71,9 +71,10 @@ java -Duser.home="$PWD/validation/fhir-home" -jar validation/validator_cli.jar \
   -tx n/a
 ```
 
-The first run downloads the packages listed in `validation/packages.txt` into `validation/fhir-home/` (about 1.2 GB,
-ignored by git).
-Later runs work without network. To check this on Linux, put `unshare -rn` in front of the command. Offline, the validator prints `Error fetching ...` for `hl7.terminology` and `hl7.fhir.uv.extensions`. It then uses
+The first run downloads the package given with `-ig`, its dependencies and the FHIR base packages into
+`validation/fhir-home/` (about 1.2 GB, ignored by git). The validator does not read `validation/packages.txt`. This file
+only lists the resulting packages, so that you can compare your cache with it (see below).
+Later runs work without network. To check this, turn off the network and run the command again. Offline, the validator prints `Error fetching ...` for `hl7.terminology` and `hl7.fhir.uv.extensions`. It then uses
 the cached packages, so these messages can be ignored.
 
 - `-Duser.home` keeps the package cache in the repository instead of `~/.fhir`.
