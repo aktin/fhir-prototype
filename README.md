@@ -73,13 +73,14 @@ java -Duser.home="$PWD/validation/fhir-home" -jar validation/validator_cli.jar \
 
 The first run downloads the packages listed in `validation/packages.txt` into `validation/fhir-home/` (about 1.2 GB,
 ignored by git).
-Later runs work without network. To check this on Linux, put `unshare -rn` in front of the command.
+Later runs work without network. To check this on Linux, put `unshare -rn` in front of the command. Offline, the validator prints `Error fetching ...` for `hl7.terminology` and `hl7.fhir.uv.extensions`. It then uses
+the cached packages, so these messages can be ignored.
 
 - `-Duser.home` keeps the package cache in the repository instead of `~/.fhir`.
 - `-tx n/a` turns off the terminology server, so codes are not checked against value sets. We have no SNOMED CT licence.
 - `2027.0.0-ballot.3` is the only published version of the MII ICU module that contains the score profiles of the
   fixtures.
-- Loading takes about 40 seconds and up to 7 GB of memory.
+- Loading takes about 40 seconds and about 1 GB of memory.
 
 Expected result: RASS passes. NRS fails with slicing errors on `Observation.code.coding`, which come from the profile,
 not from the data.
@@ -108,7 +109,7 @@ Entries with an empty `concept_cd` end up in `unmapped.csv`.
 
 ## Test data
 
-All bundles in `tests/fixtures/` are **synthetic**. They contain no real
+All files in `tests/fixtures/` are **synthetic**. They contain no real
 patient data. Each bundle holds one patient with one ICU encounter and
 observations based on the MII ICU module and ISiK profiles.
 
@@ -117,5 +118,7 @@ observations based on the MII ICU module and ISiK profiles.
 | `bundle_min.json`   | 68 resources, minimal example                        |
 | `bundle_max_1.json` | 248 resources, finished encounter                    |
 | `bundle_max_2.json` | 248 resources, ongoing encounter, spans a DST change |
+| `observation_rass.json` | RASS observation from `bundle_min.json`, for validation |
+| `observation_nrs.json`  | NRS observation from `bundle_min.json`, for validation  |
 
 Do not add real patient data to this repository.
