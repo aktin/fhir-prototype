@@ -101,3 +101,19 @@ def write_profiles(collected: dict[str, dict], out_dir: Path) -> None:
         old.unlink()
     for name, resource in files.items():
         (out_dir / name).write_text(json.dumps(resource), encoding="utf-8")
+
+
+def build(
+    packages_dir: Path, release: str, roots: list[str], out_dir: Path, validator_packages: list[str]
+) -> tuple[list[str], list[str]]:
+    """Write the resources the roots need into out_dir.
+
+    Return the roots and the referenced URLs that are neither in the release nor in the validator packages.
+    """
+    tree = [package_id for package_id in package_tree(packages_dir, release) if package_id not in validator_packages]
+    source = load_resources(packages_dir, tree)
+    known = set(load_resources(packages_dir, validator_packages))
+    collected, missing = collect(roots, source, known)
+    write_profiles(collected, out_dir)
+    root_set = set(roots)
+    return [url for url in missing if url in root_set], [url for url in missing if url not in root_set]
