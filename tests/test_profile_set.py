@@ -1,4 +1,7 @@
-from fhir_prototype.profile_set import collect
+import json
+from pathlib import Path
+
+from fhir_prototype.profile_set import collect, package_tree
 
 OBSERVATION = "http://hl7.org/fhir/StructureDefinition/Observation"
 EXTENSION = "http://hl7.org/fhir/StructureDefinition/Extension"
@@ -78,3 +81,22 @@ def test_collect_reports_missing_profile():
 
     assert set(collected) == {profile["url"]}
     assert missing == [old_peep]
+
+
+def write_package(packages_dir: Path, name: str, version: str, dependencies: dict[str, str]) -> None:
+    package_dir = packages_dir / f"{name}#{version}" / "package"
+    package_dir.mkdir(parents=True)
+    manifest = {"name": name, "version": version, "dependencies": dependencies}
+    (package_dir / "package.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_package_tree_lists_dependencies_nearest_first(tmp_path):
+    write_package(tmp_path, "icu", "1.0.0", {"isik": "6.0.0", "base": "2.0.0"})
+    write_package(tmp_path, "isik", "6.0.0", {"base": "1.0.0", "ti": "1.3.1"})
+    write_package(tmp_path, "base", "2.0.0", {})
+    write_package(tmp_path, "base", "1.0.0", {})
+    write_package(tmp_path, "ti", "1.3.1", {"base": "2.0.0"})
+
+    tree = package_tree(tmp_path, "icu#1.0.0")
+
+    assert tree == ["icu#1.0.0", "isik#6.0.0", "base#2.0.0", "base#1.0.0", "ti#1.3.1"]
