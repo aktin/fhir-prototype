@@ -100,3 +100,23 @@ def test_package_tree_lists_dependencies_nearest_first(tmp_path):
     tree = package_tree(tmp_path, "icu#1.0.0")
 
     assert tree == ["icu#1.0.0", "isik#6.0.0", "base#2.0.0", "base#1.0.0", "ti#1.3.1"]
+
+
+def test_package_tree_skips_fhir_core(tmp_path):
+    write_package(tmp_path, "icu", "1.0.0", {"hl7.fhir.r4.core": "4.0.1", "backport": "1.1.0"})
+    write_package(tmp_path, "backport", "1.1.0", {"hl7.fhir.r4.core": "4.0.0"})
+
+    tree = package_tree(tmp_path, "icu#1.0.0")
+
+    assert tree == ["icu#1.0.0", "backport#1.1.0"]
+
+
+def test_package_tree_resolves_patch_wildcard_to_latest_cached(tmp_path):
+    write_package(tmp_path, "icu", "1.0.0", {"base": "1.5.x"})
+    write_package(tmp_path, "base", "1.5.4", {})
+    write_package(tmp_path, "base", "1.5.10", {})
+    write_package(tmp_path, "base", "1.6.0", {})
+
+    tree = package_tree(tmp_path, "icu#1.0.0")
+
+    assert tree == ["icu#1.0.0", "base#1.5.10"]
