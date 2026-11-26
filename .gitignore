@@ -19,3 +19,4 @@ lefthook-local.yml
 # validation
 validation/validator_cli.jar
 validation/fhir-home/
+validation/profiles/
