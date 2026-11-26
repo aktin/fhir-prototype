@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from fhir_prototype.profile_set import collect, load_resources, package_tree, write_profiles
+from fhir_prototype.profile_set import build, collect, load_resources, package_tree, write_profiles
 
 OBSERVATION = "http://hl7.org/fhir/StructureDefinition/Observation"
 EXTENSION = "http://hl7.org/fhir/StructureDefinition/Extension"
@@ -162,3 +162,38 @@ def test_write_profiles_rejects_duplicate_file_names(tmp_path):
 
     with pytest.raises(ValueError, match="StructureDefinition-score.json"):
         write_profiles({first["url"]: first, second["url"]: second}, tmp_path)
+
+
+def test_build_writes_release_profiles_and_reports_missing(tmp_path):
+    packages_dir = tmp_path / "packages"
+    out_dir = tmp_path / "profiles"
+    core, terminology = "hl7.fhir.r4.core#4.0.1", "hl7.terminology.r4#6.2.0"
+    write_package(packages_dir, "icu", "1.0.0", {"base": "1.0.0", "hl7.terminology.r4": "6.2.0"})
+    write_package(packages_dir, "base", "1.0.0", {})
+    write_package(packages_dir, "hl7.terminology.r4", "6.2.0", {})
+    loinc = {"resourceType": "ValueSet", "id": "loinc", "url": "http://example.org/ValueSet/loinc"}
+    kbv = "http://example.org/ValueSet/kbv"
+    score = make_profile(
+        "score",
+        elements=[
+            {"path": "Observation.code", "binding": {"valueSet": loinc["url"]}},
+            {"path": "Observation.bodySite", "binding": {"valueSet": kbv}},
+        ],
+    ) | {"id": "score"}
+    rass = make_profile("score-rass", parent=score["url"]) | {"id": "score-rass"}
+    write_resource(packages_dir, core, "StructureDefinition-Observation.json", {"url": OBSERVATION})
+    write_resource(packages_dir, terminology, "ValueSet-loinc.json", loinc)
+    write_resource(packages_dir, "icu#1.0.0", "StructureDefinition-score-rass.json", rass)
+    write_resource(packages_dir, "base#1.0.0", "StructureDefinition-score.json", score)
+    old_peep = BASE + "vent-positiv-endexspiratorischer-druck"
+
+    missing_roots, missing_references = build(
+        packages_dir, "icu#1.0.0", [rass["url"], old_peep], out_dir, validator_packages=[core, terminology]
+    )
+
+    assert missing_roots == [old_peep]
+    assert missing_references == [kbv]
+    assert sorted(path.name for path in out_dir.iterdir()) == [
+        "StructureDefinition-score-rass.json",
+        "StructureDefinition-score.json",
+    ]
