@@ -197,3 +197,21 @@ def test_build_writes_release_profiles_and_reports_missing(tmp_path):
         "StructureDefinition-score-rass.json",
         "StructureDefinition-score.json",
     ]
+
+
+def test_package_tree_ignores_pre_releases_for_patch_wildcard(tmp_path):
+    write_package(tmp_path, "icu", "1.0.0", {"base": "1.5.x"})
+    write_package(tmp_path, "base", "1.5.4", {})
+    write_package(tmp_path, "base", "1.5.5-ballot.3", {})
+
+    tree = package_tree(tmp_path, "icu#1.0.0")
+
+    assert tree == ["icu#1.0.0", "base#1.5.4"]
+
+
+def test_package_tree_reports_unmatched_patch_wildcard(tmp_path):
+    write_package(tmp_path, "icu", "1.0.0", {"base": "1.5.x"})
+    write_package(tmp_path, "base", "1.6.0", {})
+
+    with pytest.raises(FileNotFoundError, match=r"base#1\.5\.x"):
+        package_tree(tmp_path, "icu#1.0.0")
