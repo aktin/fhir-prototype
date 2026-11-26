@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from fhir_prototype.profile_set import build, collect, load_resources, package_tree, write_profiles
+from fhir_prototype.profile_set import build, collect, load_resources, load_urls, package_tree, write_profiles
 
 OBSERVATION = "http://hl7.org/fhir/StructureDefinition/Observation"
 EXTENSION = "http://hl7.org/fhir/StructureDefinition/Extension"
@@ -142,6 +142,17 @@ def test_load_resources_indexes_by_url_nearest_package_first(tmp_path):
 
     assert list(resources) == [url]
     assert resources[url]["version"] == "1"
+
+
+def test_load_urls_returns_only_urls(tmp_path):
+    write_resource(tmp_path, "core#1.0.0", "StructureDefinition-score.json", make_profile("score"))
+    write_resource(tmp_path, "core#1.0.0", "package.json", {"name": "core", "url": "http://example.org/ig"})
+    write_resource(tmp_path, "core#1.0.0", "Bundle-no-url.json", {"resourceType": "Bundle"})
+    write_resource(tmp_path, "terminology#1.0.0", "ValueSet-x.json", {"resourceType": "ValueSet", "url": BASE + "x"})
+
+    urls = load_urls(tmp_path, ["core#1.0.0", "terminology#1.0.0"])
+
+    assert urls == {BASE + "score", BASE + "x"}
 
 
 def test_write_profiles_replaces_folder_content(tmp_path):
