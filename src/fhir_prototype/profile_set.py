@@ -86,3 +86,18 @@ def load_resources(packages_dir: Path, package_ids: list[str]) -> dict[str, dict
             if url:
                 resources.setdefault(url, resource)
     return resources
+
+
+def write_profiles(collected: dict[str, dict], out_dir: Path) -> None:
+    """Replace the JSON files in out_dir with the collected resources."""
+    files: dict[str, dict] = {}
+    for url, resource in collected.items():
+        name = f"{resource['resourceType']}-{resource['id']}.json"
+        if name in files:
+            raise ValueError(f"duplicate file name {name}: {files[name]['url']} and {url}")
+        files[name] = resource
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for old in out_dir.glob("*.json"):
+        old.unlink()
+    for name, resource in files.items():
+        (out_dir / name).write_text(json.dumps(resource), encoding="utf-8")
