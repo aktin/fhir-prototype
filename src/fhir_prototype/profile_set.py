@@ -3,6 +3,22 @@ import re
 from collections import deque
 from pathlib import Path
 
+from fhir_prototype.mapping import load_mapping
+
+RELEASE = "de.medizininformatikinitiative.kerndatensatz.icu#2027.0.0-ballot.3"
+PACKAGES_DIR = Path("validation/fhir-home/.fhir/packages")
+OUT_DIR = Path("validation/profiles")
+# Loaded by validator 7.0.6 with -version 4.0.1 on its own, so they stay in the package cache.
+VALIDATOR_PACKAGES = [
+    "hl7.fhir.r4.core#4.0.1",
+    "hl7.fhir.xver-extensions#0.1.0",
+    "hl7.terminology.r4#6.2.0",
+    "hl7.fhir.uv.extensions.r4#5.2.0",
+    "hl7.terminology#7.5.0",
+    "hl7.terminology.r5#7.5.0",
+    "hl7.fhir.uv.extensions#5.4.0",
+]
+
 
 def _references(resource: dict) -> set[str]:
     found: set[str] = set()
@@ -117,3 +133,19 @@ def build(
     write_profiles(collected, out_dir)
     root_set = set(roots)
     return [url for url in missing if url in root_set], [url for url in missing if url not in root_set]
+
+
+def main() -> None:
+    roots = sorted({entry["profile"] for entry in load_mapping()})
+    missing_roots, missing_references = build(PACKAGES_DIR, RELEASE, roots, OUT_DIR, VALIDATOR_PACKAGES)
+    print(f"Wrote {len(list(OUT_DIR.glob('*.json')))} files for {len(roots)} mapping profiles to {OUT_DIR}")
+    print(f"Mapping profiles not in {RELEASE}:")
+    for url in missing_roots:
+        print(f"  {url}")
+    print("Referenced resources not in the packages:")
+    for url in missing_references:
+        print(f"  {url}")
+
+
+if __name__ == "__main__":
+    main()
