@@ -1,4 +1,5 @@
 import json
+import re
 from collections import deque
 from pathlib import Path
 
@@ -55,5 +56,19 @@ def package_tree(packages_dir: Path, root: str) -> list[str]:
         manifest_path = packages_dir / package_id / "package" / "package.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         for name, version in manifest.get("dependencies", {}).items():
-            todo.append(f"{name}#{version}")
+            dependency = _resolve(packages_dir, name, version)
+            if dependency is not None:
+                todo.append(dependency)
     return tree
+
+
+def _resolve(packages_dir: Path, name: str, version: str) -> str | None:
+    """Return the cached package id for a dependency, or None for FHIR core."""
+    if re.fullmatch(r"hl7\.fhir\.r\d+\.core", name):
+        return None
+    if not version.endswith(".x"):
+        return f"{name}#{version}"
+    prefix = version.removesuffix("x")
+    candidates = [path.name.split("#", 1)[1] for path in packages_dir.glob(f"{name}#{prefix}*")]
+    latest = max(candidates, key=lambda v: tuple(int(part) for part in v.split(".")))
+    return f"{name}#{latest}"
