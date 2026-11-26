@@ -92,6 +92,34 @@ To compare your package cache with the list:
 diff validation/packages.txt <(ls validation/fhir-home/.fhir/packages | grep -v '^packages.ini$' | sort)
 ```
 
+### Minimal profile folder
+
+Most of the package cache is never used, because we only validate the profiles in `icu_mapping.json`. This command
+reads the profile URLs from the mapping and collects them from the filled package cache, together with their parent
+profiles, extensions, value sets and code systems:
+
+```bash
+uv run python -m fhir_prototype.profile_set
+```
+
+It writes the resources as JSON files into `validation/profiles/` (about 5 MB, ignored by git) and lists the mapping
+profiles that are not in the MII ICU release, and the referenced resources that are in none of the packages.
+
+Validate with the folder instead of the ICU package:
+
+```bash
+java -Duser.home="$PWD/validation/fhir-home" -jar validation/validator_cli.jar \
+  tests/fixtures/observation_rass.json tests/fixtures/observation_nrs.json \
+  -version 4.0.1 \
+  -ig validation/profiles \
+  -tx n/a
+```
+
+The result is the same as with the ICU package. With `-version 4.0.1` the validator still loads the FHIR core,
+terminology and extension packages on its own, so the package cache must keep them. They are listed in
+`VALIDATOR_PACKAGES` in `src/fhir_prototype/profile_set.py` (about 300 MB). A machine that only validates needs these
+packages and the folder, not the whole cache.
+
 ## Mapping
 
 `src/fhir_prototype/icu_mapping.json` assigns an i2b2 `concept_cd` to each FHIR

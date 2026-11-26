@@ -5,21 +5,20 @@ name: Claude PR Review
 # remove and add the label "claude-review".
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, labeled]
+    types: [ opened, reopened, ready_for_review, labeled ]
     paths-ignore:
       - "**.md"
       - "uv.lock"
       - "LICENSE"
-
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
 
 jobs:
   review:
     if: >-
       !github.event.pull_request.draft &&
       (github.event.action != 'labeled' || github.event.label.name == 'claude-review')
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
