@@ -67,3 +67,14 @@ def test_collect_follows_value_set_binding():
 
     assert set(collected) == {profile["url"], value_set["url"], code_system["url"]}
     assert missing == []
+
+
+def test_collect_reports_missing_profile():
+    profile = make_profile("score-rass")
+    source = {profile["url"]: profile}
+    old_peep = BASE + "vent-positiv-endexspiratorischer-druck"
+
+    collected, missing = collect([profile["url"], old_peep], source, known={OBSERVATION})
+
+    assert set(collected) == {profile["url"]}
+    assert missing == [old_peep]
