@@ -72,3 +72,17 @@ def _resolve(packages_dir: Path, name: str, version: str) -> str | None:
     candidates = [path.name.split("#", 1)[1] for path in packages_dir.glob(f"{name}#{prefix}*")]
     latest = max(candidates, key=lambda v: tuple(int(part) for part in v.split(".")))
     return f"{name}#{latest}"
+
+
+def load_resources(packages_dir: Path, package_ids: list[str]) -> dict[str, dict]:
+    """Index the resources of the packages by URL, the first package wins."""
+    resources: dict[str, dict] = {}
+    for package_id in package_ids:
+        for path in sorted((packages_dir / package_id / "package").glob("*.json")):
+            if path.name == "package.json":
+                continue
+            resource = json.loads(path.read_text(encoding="utf-8"))
+            url = resource.get("url")
+            if url:
+                resources.setdefault(url, resource)
+    return resources
