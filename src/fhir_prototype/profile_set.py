@@ -85,7 +85,10 @@ def _resolve(packages_dir: Path, name: str, version: str) -> str | None:
     if not version.endswith(".x"):
         return f"{name}#{version}"
     prefix = version.removesuffix("x")
-    candidates = [path.name.split("#", 1)[1] for path in packages_dir.glob(f"{name}#{prefix}*")]
+    versions = [path.name.split("#", 1)[1] for path in packages_dir.glob(f"{name}#{prefix}*")]
+    candidates = [v for v in versions if re.fullmatch(r"\d+(\.\d+)*", v)]
+    if not candidates:
+        raise FileNotFoundError(f"no cached version of {name}#{version} in {packages_dir}")
     latest = max(candidates, key=lambda v: tuple(int(part) for part in v.split(".")))
     return f"{name}#{latest}"
 
