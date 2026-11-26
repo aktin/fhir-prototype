@@ -5,6 +5,10 @@ def _references(resource: dict) -> set[str]:
     found: set[str] = set()
     if resource.get("baseDefinition"):
         found.add(resource["baseDefinition"])
+    elements = resource.get("differential", {}).get("element", []) + resource.get("snapshot", {}).get("element", [])
+    for element in elements:
+        for element_type in element.get("type", []):
+            found.update(element_type.get("profile", []))
     return {url.split("|")[0] for url in found}
 
 
