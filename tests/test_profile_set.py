@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from fhir_prototype.profile_set import collect, package_tree
+from fhir_prototype.profile_set import collect, load_resources, package_tree
 
 OBSERVATION = "http://hl7.org/fhir/StructureDefinition/Observation"
 EXTENSION = "http://hl7.org/fhir/StructureDefinition/Extension"
@@ -120,3 +120,23 @@ def test_package_tree_resolves_patch_wildcard_to_latest_cached(tmp_path):
     tree = package_tree(tmp_path, "icu#1.0.0")
 
     assert tree == ["icu#1.0.0", "base#1.5.10"]
+
+
+def write_resource(packages_dir: Path, package_id: str, file_name: str, resource: dict) -> None:
+    path = packages_dir / package_id / "package" / file_name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(resource), encoding="utf-8")
+
+
+def test_load_resources_indexes_by_url_nearest_package_first(tmp_path):
+    url = BASE + "score"
+    write_resource(tmp_path, "icu#1.0.0", "StructureDefinition-score.json", make_profile("score") | {"version": "1"})
+    write_resource(tmp_path, "base#1.0.0", "StructureDefinition-score.json", make_profile("score") | {"version": "0"})
+    write_resource(tmp_path, "icu#1.0.0", "package.json", {"name": "icu", "url": "http://example.org/ig"})
+    write_resource(tmp_path, "icu#1.0.0", "Bundle-no-url.json", {"resourceType": "Bundle"})
+    write_resource(tmp_path, "icu#1.0.0", "example/StructureDefinition-x.json", make_profile("x"))
+
+    resources = load_resources(tmp_path, ["icu#1.0.0", "base#1.0.0"])
+
+    assert list(resources) == [url]
+    assert resources[url]["version"] == "1"
