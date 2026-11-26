@@ -9,6 +9,13 @@ def _references(resource: dict) -> set[str]:
     for element in elements:
         for element_type in element.get("type", []):
             found.update(element_type.get("profile", []))
+        if element.get("binding", {}).get("valueSet"):
+            found.add(element["binding"]["valueSet"])
+    compose = resource.get("compose", {})
+    for part in compose.get("include", []) + compose.get("exclude", []):
+        if part.get("system"):
+            found.add(part["system"])
+        found.update(part.get("valueSet", []))
     return {url.split("|")[0] for url in found}
 
 
