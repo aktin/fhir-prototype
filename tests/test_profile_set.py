@@ -43,3 +43,27 @@ def test_collect_follows_extension():
 
     assert set(collected) == {profile["url"], extension["url"]}
     assert missing == []
+
+
+def test_collect_follows_value_set_binding():
+    code_system = {"resourceType": "CodeSystem", "url": "http://example.org/CodeSystem/rass"}
+    value_set = {
+        "resourceType": "ValueSet",
+        "url": "http://example.org/ValueSet/rass",
+        "compose": {"include": [{"system": code_system["url"]}]},
+    }
+    profile = make_profile(
+        "score-rass",
+        elements=[
+            {
+                "path": "Observation.value[x]",
+                "binding": {"strength": "required", "valueSet": value_set["url"] + "|1.0.0"},
+            }
+        ],
+    )
+    source = {r["url"]: r for r in (code_system, value_set, profile)}
+
+    collected, missing = collect([profile["url"]], source, known={OBSERVATION})
+
+    assert set(collected) == {profile["url"], value_set["url"], code_system["url"]}
+    assert missing == []
