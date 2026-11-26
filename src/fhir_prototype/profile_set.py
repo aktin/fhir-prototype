@@ -1,6 +1,7 @@
 import json
 import re
 from collections import deque
+from collections.abc import Iterator
 from pathlib import Path
 
 from fhir_prototype.mapping import load_mapping
@@ -93,18 +94,27 @@ def _resolve(packages_dir: Path, name: str, version: str) -> str | None:
     return f"{name}#{latest}"
 
 
+def _package_resources(packages_dir: Path, package_ids: list[str]) -> Iterator[dict]:
+    """Yield the resources of the packages one by one, in package order."""
+    for package_id in package_ids:
+        for path in sorted((packages_dir / package_id / "package").glob("*.json")):
+            if path.name != "package.json":
+                yield json.loads(path.read_text(encoding="utf-8"))
+
+
 def load_resources(packages_dir: Path, package_ids: list[str]) -> dict[str, dict]:
     """Index the resources of the packages by URL, the first package wins."""
     resources: dict[str, dict] = {}
-    for package_id in package_ids:
-        for path in sorted((packages_dir / package_id / "package").glob("*.json")):
-            if path.name == "package.json":
-                continue
-            resource = json.loads(path.read_text(encoding="utf-8"))
-            url = resource.get("url")
-            if url:
-                resources.setdefault(url, resource)
+    for resource in _package_resources(packages_dir, package_ids):
+        url = resource.get("url")
+        if url:
+            resources.setdefault(url, resource)
     return resources
+
+
+def load_urls(packages_dir: Path, package_ids: list[str]) -> set[str]:
+    """Return the resource URLs of the packages without keeping the resources."""
+    return {resource["url"] for resource in _package_resources(packages_dir, package_ids) if resource.get("url")}
 
 
 def write_profiles(collected: dict[str, dict], out_dir: Path) -> None:
@@ -131,7 +141,7 @@ def build(
     """
     tree = [package_id for package_id in package_tree(packages_dir, release) if package_id not in validator_packages]
     source = load_resources(packages_dir, tree)
-    known = set(load_resources(packages_dir, validator_packages))
+    known = load_urls(packages_dir, validator_packages)
     collected, missing = collect(roots, source, known)
     write_profiles(collected, out_dir)
     root_set = set(roots)
