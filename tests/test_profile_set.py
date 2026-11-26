@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 
-from fhir_prototype.profile_set import collect, load_resources, package_tree
+import pytest
+
+from fhir_prototype.profile_set import collect, load_resources, package_tree, write_profiles
 
 OBSERVATION = "http://hl7.org/fhir/StructureDefinition/Observation"
 EXTENSION = "http://hl7.org/fhir/StructureDefinition/Extension"
@@ -140,3 +142,23 @@ def test_load_resources_indexes_by_url_nearest_package_first(tmp_path):
 
     assert list(resources) == [url]
     assert resources[url]["version"] == "1"
+
+
+def test_write_profiles_replaces_folder_content(tmp_path):
+    out_dir = tmp_path / "profiles"
+    out_dir.mkdir()
+    (out_dir / "StructureDefinition-old.json").write_text("{}", encoding="utf-8")
+    profile = make_profile("score") | {"id": "score"}
+
+    write_profiles({profile["url"]: profile}, out_dir)
+
+    assert sorted(path.name for path in out_dir.iterdir()) == ["StructureDefinition-score.json"]
+    assert json.loads((out_dir / "StructureDefinition-score.json").read_text(encoding="utf-8")) == profile
+
+
+def test_write_profiles_rejects_duplicate_file_names(tmp_path):
+    first = make_profile("score") | {"id": "score"}
+    second = make_profile("other") | {"id": "score"}
+
+    with pytest.raises(ValueError, match="StructureDefinition-score.json"):
+        write_profiles({first["url"]: first, second["url"]: second}, tmp_path)
