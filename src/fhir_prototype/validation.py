@@ -18,7 +18,9 @@ def select_resources(bundle: dict[str, Any], profiles: set[str]) -> tuple[dict[s
     kept = []
     for entry in bundle.get("entry", []):
         resource = entry.get("resource", {})
-        if resource.get("resourceType") in CORE_TYPES or profiles & set(resource.get("meta", {}).get("profile", [])):
+        # A canonical in meta.profile may carry a version (url|version), the mapping has none.
+        own = {url.split("|")[0] for url in resource.get("meta", {}).get("profile", [])}
+        if resource.get("resourceType") in CORE_TYPES or profiles & own:
             kept.append(entry)
     return {**bundle, "entry": kept}, len(bundle.get("entry", [])) - len(kept)
 
@@ -59,7 +61,9 @@ class NoValidation(BundleValidator):
 class HapiValidator(BundleValidator):
     """Validates bundles locally with the HL7 FHIR validator, without a terminology server."""
 
-    def __init__(self, profiles: set[str], java: str, jar: Path, ig: Path, fhir_home: Path) -> None:
+    def __init__(
+        self, profiles: set[str], java: str, jar: Path, ig: Path, fhir_home: Path, timeout: float = 600
+    ) -> None:
         if shutil.which(java) is None:
             raise FileNotFoundError(f"Java not found: {java}")
         if not jar.is_file():
@@ -69,6 +73,7 @@ class HapiValidator(BundleValidator):
         self.jar = jar
         self.ig = ig
         self.fhir_home = fhir_home
+        self.timeout = timeout
 
     def is_valid(self, bundle: dict[str, Any]) -> bool:
         selected, ignored = select_resources(bundle, self.profiles)
@@ -94,7 +99,8 @@ class HapiValidator(BundleValidator):
                 str(outcome_file),
             ]
             # Exit code 1 only means that the bundle has errors, the outcome file tells the rest.
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            # A hung JVM is killed after the timeout and subprocess.TimeoutExpired is raised.
+            completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=self.timeout)
             if not outcome_file.is_file():
                 raise RuntimeError(
                     f"FHIR validator wrote no result (exit code {completed.returncode}): {completed.stderr}"
