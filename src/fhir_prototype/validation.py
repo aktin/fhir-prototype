@@ -1,5 +1,8 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # No profile in the mapping, validated against FHIR R4 core.
 CORE_TYPES = {"Patient", "Encounter"}
@@ -13,6 +16,25 @@ def select_resources(bundle: dict[str, Any], profiles: set[str]) -> tuple[dict[s
         if resource.get("resourceType") in CORE_TYPES or profiles & set(resource.get("meta", {}).get("profile", [])):
             kept.append(entry)
     return {**bundle, "entry": kept}, len(bundle.get("entry", [])) - len(kept)
+
+
+def _message(issue: dict[str, Any]) -> str:
+    text = issue.get("details", {}).get("text", "")
+    expression = issue.get("expression", [])
+    return f"{expression[0]}: {text}" if expression else text
+
+
+def outcome_is_valid(outcome: dict[str, Any]) -> bool:
+    """Log the errors and warnings of a validator OperationOutcome, return False if there is a fatal or error issue."""
+    valid = True
+    for issue in outcome.get("issue", []):
+        severity = issue.get("severity")
+        if severity in ("fatal", "error"):
+            logger.error(_message(issue))
+            valid = False
+        elif severity == "warning":
+            logger.warning(_message(issue))
+    return valid
 
 
 class BundleValidator(ABC):
