@@ -1,6 +1,12 @@
+import json
 import logging
+import subprocess
+import sys
+from pathlib import Path
 
-from fhir_prototype.validation import outcome_is_valid, select_resources
+import pytest
+
+from fhir_prototype.validation import HapiValidator, outcome_is_valid, select_resources
 from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation
 
 MAPPED = "https://example.org/StructureDefinition/heartrate"
@@ -94,3 +100,108 @@ def test_outcome_issue_without_expression_is_logged(caplog):
 
     assert not outcome_is_valid(outcome)
     assert [r.getMessage() for r in caplog.records] == ["no profile"]
+
+
+class FakeValidatorRun:
+    """Stands in for subprocess.run: records the command and writes the given OperationOutcome."""
+
+    def __init__(self, outcome, returncode=0):
+        self.outcome = outcome
+        self.returncode = returncode
+        self.command = None
+        self.bundle = None
+
+    def __call__(self, command, **kwargs):
+        self.command = [str(part) for part in command]
+        self.bundle = json.loads(Path(self.command[4]).read_text(encoding="utf-8"))
+        if self.outcome is not None:
+            output = Path(self.command[self.command.index("-output") + 1])
+            output.write_text(json.dumps(self.outcome), encoding="utf-8")
+        return subprocess.CompletedProcess(command, self.returncode, stdout="", stderr="java.lang.OutOfMemoryError")
+
+
+@pytest.fixture
+def make_validator(tmp_path, monkeypatch):
+    def make(outcome, returncode=0):
+        fake = FakeValidatorRun(outcome, returncode)
+        monkeypatch.setattr(subprocess, "run", fake)
+        jar = tmp_path / "validator_cli.jar"
+        jar.touch()
+        validator = HapiValidator(
+            profiles={MAPPED},
+            java=sys.executable,
+            jar=jar,
+            ig=tmp_path / "profiles",
+            fhir_home=tmp_path / "fhir-home",
+        )
+        return validator, fake
+
+    return make
+
+
+def test_hapi_validator_without_issues_is_valid(make_validator):
+    validator, _ = make_validator(_outcome())
+
+    assert validator.is_valid(make_bundle(PATIENT))
+
+
+def test_hapi_validator_with_only_warnings_is_valid(make_validator):
+    validator, _ = make_validator(_outcome(_issue("warning", "unknown code")))
+
+    assert validator.is_valid(make_bundle(PATIENT))
+
+
+def test_hapi_validator_with_error_is_invalid(make_validator):
+    validator, _ = make_validator(_outcome(_issue("error", "slice not found")), returncode=1)
+
+    assert not validator.is_valid(make_bundle(PATIENT))
+
+
+def test_hapi_validator_calls_validator_for_r4_offline(make_validator, tmp_path):
+    validator, fake = make_validator(_outcome())
+
+    validator.is_valid(make_bundle(PATIENT))
+
+    assert fake.command[:4] == [
+        sys.executable,
+        f"-Duser.home={tmp_path / 'fhir-home'}",
+        "-jar",
+        str(tmp_path / "validator_cli.jar"),
+    ]
+    options = fake.command[5:]
+    assert options[options.index("-version") + 1] == "4.0.1"
+    assert options[options.index("-ig") + 1] == str(tmp_path / "profiles")
+    assert options[options.index("-tx") + 1] == "n/a"
+
+
+def test_hapi_validator_passes_only_selected_resources(make_validator, caplog):
+    caplog.set_level(logging.INFO, logger="fhir_prototype.validation")
+    validator, fake = make_validator(_outcome())
+    other = make_observation(id="o2", meta={"profile": [OTHER]})
+
+    validator.is_valid(make_bundle(PATIENT, ENCOUNTER, make_observation(id="o1"), other))
+
+    assert _types_and_ids(fake.bundle) == [("Patient", "p1"), ("Encounter", "e1"), ("Observation", "o1")]
+    assert "Ignored 1 resources with a profile outside the mapping" in caplog.messages
+
+
+def test_hapi_validator_raises_if_validator_writes_no_outcome(make_validator):
+    validator, _ = make_validator(None, returncode=2)
+
+    with pytest.raises(RuntimeError, match="OutOfMemoryError"):
+        validator.is_valid(make_bundle(PATIENT))
+
+
+def test_hapi_validator_raises_if_java_is_missing(tmp_path):
+    jar = tmp_path / "validator_cli.jar"
+    jar.touch()
+
+    with pytest.raises(FileNotFoundError, match="no-such-java"):
+        HapiValidator(profiles=set(), java="no-such-java", jar=jar, ig=tmp_path, fhir_home=tmp_path)
+
+
+def test_hapi_validator_raises_if_jar_is_missing(tmp_path):
+    with pytest.raises(FileNotFoundError, match="validator_cli.jar"):
+        HapiValidator(
+            profiles=set(), java=sys.executable, jar=tmp_path / "validator_cli.jar", ig=tmp_path, fhir_home=tmp_path
+        )
