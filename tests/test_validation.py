@@ -1,4 +1,6 @@
-from fhir_prototype.validation import select_resources
+import logging
+
+from fhir_prototype.validation import outcome_is_valid, select_resources
 from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation
 
 MAPPED = "https://example.org/StructureDefinition/heartrate"
@@ -51,3 +53,44 @@ def test_select_resources_does_not_change_the_input_bundle():
     select_resources(bundle, {MAPPED})
 
     assert len(bundle["entry"]) == 1
+
+
+def _issue(severity, text, expression="Bundle.entry[0].resource"):
+    return {"severity": severity, "code": "processing", "details": {"text": text}, "expression": [expression]}
+
+
+def _outcome(*issues):
+    return {"resourceType": "OperationOutcome", "issue": list(issues)}
+
+
+def test_outcome_without_issues_is_valid():
+    assert outcome_is_valid({"resourceType": "OperationOutcome"})
+
+
+def test_outcome_with_only_warnings_and_information_is_valid(caplog):
+    outcome = _outcome(_issue("warning", "unknown code"), _issue("information", "no terminology server"))
+
+    assert outcome_is_valid(outcome)
+    assert [(r.levelno, r.getMessage()) for r in caplog.records] == [
+        (logging.WARNING, "Bundle.entry[0].resource: unknown code")
+    ]
+
+
+def test_outcome_with_error_is_invalid(caplog):
+    outcome = _outcome(_issue("warning", "unknown code"), _issue("error", "slice not found"))
+
+    assert not outcome_is_valid(outcome)
+    assert (logging.ERROR, "Bundle.entry[0].resource: slice not found") in [
+        (r.levelno, r.getMessage()) for r in caplog.records
+    ]
+
+
+def test_outcome_with_fatal_is_invalid():
+    assert not outcome_is_valid(_outcome(_issue("fatal", "cannot parse")))
+
+
+def test_outcome_issue_without_expression_is_logged(caplog):
+    outcome = _outcome({"severity": "error", "code": "processing", "details": {"text": "no profile"}})
+
+    assert not outcome_is_valid(outcome)
+    assert [r.getMessage() for r in caplog.records] == ["no profile"]
