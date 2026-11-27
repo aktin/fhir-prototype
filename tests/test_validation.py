@@ -51,6 +51,15 @@ def test_select_resources_drops_resources_without_profile():
     assert ignored == 1
 
 
+def test_select_resources_ignores_profile_version():
+    versioned = make_observation(id="o1", meta={"profile": [f"{MAPPED}|2027.0.0-ballot.3"]})
+
+    selected, ignored = select_resources(make_bundle(versioned), {MAPPED})
+
+    assert _types_and_ids(selected) == [("Observation", "o1")]
+    assert ignored == 0
+
+
 def test_select_resources_keeps_resource_if_any_profile_is_mapped():
     both = make_observation(id="o1", meta={"profile": [OTHER, MAPPED]})
 
@@ -116,9 +125,11 @@ class FakeValidatorRun:
         self.returncode = returncode
         self.command = None
         self.bundle = None
+        self.kwargs = None
 
     def __call__(self, command, **kwargs):
         self.command = [str(part) for part in command]
+        self.kwargs = kwargs
         self.bundle = json.loads(Path(self.command[4]).read_text(encoding="utf-8"))
         if self.outcome is not None:
             output = Path(self.command[self.command.index("-output") + 1])
@@ -128,7 +139,7 @@ class FakeValidatorRun:
 
 @pytest.fixture
 def make_validator(tmp_path, monkeypatch):
-    def make(outcome, returncode=0):
+    def make(outcome, returncode=0, **options):
         fake = FakeValidatorRun(outcome, returncode)
         monkeypatch.setattr(subprocess, "run", fake)
         jar = tmp_path / "validator_cli.jar"
@@ -139,6 +150,7 @@ def make_validator(tmp_path, monkeypatch):
             jar=jar,
             ig=tmp_path / "profiles",
             fhir_home=tmp_path / "fhir-home",
+            **options,
         )
         return validator, fake
 
@@ -189,6 +201,14 @@ def test_hapi_validator_passes_only_selected_resources(make_validator, caplog):
 
     assert _types_and_ids(fake.bundle) == [("Patient", "p1"), ("Encounter", "e1"), ("Observation", "o1")]
     assert "Ignored 1 resources with a profile outside the mapping" in caplog.messages
+
+
+def test_hapi_validator_passes_timeout_to_the_validator_run(make_validator):
+    validator, fake = make_validator(_outcome(), timeout=42)
+
+    validator.is_valid(make_bundle(PATIENT))
+
+    assert fake.kwargs["timeout"] == 42
 
 
 def test_hapi_validator_raises_if_validator_writes_no_outcome(make_validator):
