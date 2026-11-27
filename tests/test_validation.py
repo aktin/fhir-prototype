@@ -1,16 +1,22 @@
 import json
 import logging
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from fhir_prototype.mapping import load_mapping
 from fhir_prototype.validation import HapiValidator, outcome_is_valid, select_resources
-from helpers import ENCOUNTER, PATIENT, make_bundle, make_observation
+from helpers import ENCOUNTER, FIXTURES, PATIENT, make_bundle, make_observation
 
 MAPPED = "https://example.org/StructureDefinition/heartrate"
 OTHER = "https://pdms.example.org/StructureDefinition/vendor-specific"
+VALIDATION = Path(__file__).parents[1] / "validation"
+JAR = VALIDATION / "validator_cli.jar"
+FHIR_HOME = VALIDATION / "fhir-home"
+PROFILES = VALIDATION / "profiles"
 
 
 def _types_and_ids(bundle):
@@ -205,3 +211,26 @@ def test_hapi_validator_raises_if_jar_is_missing(tmp_path):
         HapiValidator(
             profiles=set(), java=sys.executable, jar=tmp_path / "validator_cli.jar", ig=tmp_path, fhir_home=tmp_path
         )
+
+
+@pytest.mark.skipif(
+    shutil.which("java") is None or not JAR.is_file() or not FHIR_HOME.is_dir() or not PROFILES.is_dir(),
+    reason="needs Java, validation/validator_cli.jar, validation/fhir-home and validation/profiles",
+)
+def test_hapi_validator_runs_real_validator_on_bundle_min(caplog):
+    validator = HapiValidator(
+        profiles={entry["profile"] for entry in load_mapping()},
+        java="java",
+        jar=JAR,
+        ig=PROFILES,
+        fhir_home=FHIR_HOME,
+    )
+    bundle = json.loads((FIXTURES / "bundle_min.json").read_text(encoding="utf-8"))
+
+    valid = validator.is_valid(bundle)
+
+    # bundle_min.json does not match the ballot.3 profiles yet (see the issue), only observations have errors.
+    errors = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+    assert not valid
+    assert errors
+    assert all("/*Observation/" in message for message in errors)
