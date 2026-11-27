@@ -120,6 +120,43 @@ terminology and extension packages on its own, so the package cache must keep th
 `VALIDATOR_PACKAGES` in `src/fhir_prototype/profile_set.py` (about 300 MB). A machine that only validates needs these
 packages and the folder, not the whole cache.
 
+### Validate bundles in the pipeline
+
+`HapiValidator` in `src/fhir_prototype/validation.py` runs the validator for each bundle. It needs Java, the jar, the
+filled package cache and the minimal profile folder from the steps above:
+
+```bash
+uv run python -c "
+from pathlib import Path
+from fhir_prototype.importer import CsvImporter
+from fhir_prototype.mapping import load_mapping
+from fhir_prototype.pipeline import run
+from fhir_prototype.validation import HapiValidator
+
+validator = HapiValidator(
+    profiles={entry['profile'] for entry in load_mapping()},
+    java='java',
+    jar=Path('validation/validator_cli.jar'),
+    ig=Path('validation/profiles'),
+    fhir_home=Path.cwd() / 'validation/fhir-home',
+)
+run('delivery.zip', CsvImporter('output'), validator)
+"
+```
+
+- Only the Patient, the Encounter and the resources whose `meta.profile` is in the mapping are validated. Other
+  resources are left out and logged as ignored. Patient and Encounter are validated against FHIR R4 core.
+- A bundle is invalid if the validator reports at least one issue with severity `fatal` or `error`. Errors and
+  warnings are logged, information messages are not. Codes that cannot be checked without a terminology server, for
+  example SNOMED CT, only give warnings or information messages.
+- The constructor raises `FileNotFoundError` if Java or the jar cannot be found.
+- One bundle takes about 15 to 20 seconds, most of it for starting Java and loading the packages.
+
+Expected result: all three bundles in `tests/fixtures/` are invalid against `2027.0.0-ballot.3`, so the command above
+skips them and ends with `InvalidBundleError: ... no bundle could be processed`. The integration test
+in `tests/test_validation.py` runs the validator on `bundle_min.json` and is skipped if Java, the jar, the package
+cache or the profile folder is missing.
+
 ## Mapping
 
 `src/fhir_prototype/icu_mapping.json` assigns an i2b2 `concept_cd` to each FHIR
